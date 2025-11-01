@@ -83,7 +83,7 @@ pub struct EBlock {
     pub sets: Vec<Set>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 #[allow(dead_code)]
 pub struct Set {
     pub w: Option<f32>,
