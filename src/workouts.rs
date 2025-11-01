@@ -63,7 +63,7 @@ query {{
     }
 }
 
-pub async fn get_dates_from(token: &str, from: Option<String>, count: u32) -> Result<Vec<String>, String> {
+pub async fn get_dates(token: &str, from: Option<String>, count: u32, reverse: bool) -> Result<Vec<String>, String> {
     let claims = auth::decode_token(&token).map_err(|e| e.to_string())?;
     let uid = claims.id;
 
@@ -108,6 +108,9 @@ query GetJRange($uid: ID!, $ymd: YMD!, $range: Int!) {
                 };
                 let mut result = selected;
                 result.sort();
+                if reverse {
+                    result.reverse();
+                }
                 Ok(result)
             } else {
                 Ok(vec![])

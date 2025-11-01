@@ -34,14 +34,17 @@ struct ListArgs {
     #[arg(short, long)]
     summary: bool,
 
-    #[arg(long)]
-    before: Option<String>,
+    #[arg(short, long)]
+    reverse: bool,
 
-    #[arg(long)]
-    count: Option<u32>,
+    #[arg(short = 'A', long)]
+    all: bool,
 
     #[arg(short, long)]
-    all: bool,
+    before: Option<String>,
+
+    #[arg(short, long)]
+    count: Option<u32>,
 
     dates: Vec<String>,
 }
@@ -71,17 +74,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             };
 
-            let (from, count) = if let Some(before) = &list.before {
+            let (from, count) = if list.all {
+                (None, 1000)
+            } else if let Some(before) = &list.before {
                 let cnt = list.count.unwrap_or(32);
                 (Some(before.clone()), cnt)
-            } else if let Some(count_str) = list.dates.get(0) {
-                let cnt = count_str.parse().unwrap_or(32);
+            } else if let Some(cnt) = list.count {
                 (None, cnt)
             } else {
                 (None, 32)
             };
 
-            let dates = match workouts::get_dates_from(&token, from, count).await {
+            let dates = match workouts::get_dates(&token, from, count, list.reverse).await {
                 Ok(d) => d,
                 Err(e) => {
                     eprintln!("{}", e);
@@ -89,8 +93,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             };
 
-            for date in dates {
-                println!("{}", date);
+            if list.details {
+                for date in dates {
+                    let workout = match workouts::get_day(&token, &date).await {
+                        Ok(w) => w,
+                        Err(e) => {
+                            eprintln!("Error getting workout for {}: {}", date, e);
+                            continue;
+                        }
+                    };
+                    println!("{}", workout);
+                }
+            } else {
+                for date in dates {
+                    println!("{}", date);
+                }
             }
         }
         Commands::Show(show) => {
