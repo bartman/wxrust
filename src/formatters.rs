@@ -115,6 +115,35 @@ pub fn format_eblocks(jday: &JDay) -> String {
     lines.join("\n")
 }
 
+pub fn summarize_workout(jday: &JDay) -> String {
+    let mut ex_map: HashMap<String, &Exercise> = HashMap::new();
+    for ex_wrap in &jday.exercises {
+        ex_map.insert(ex_wrap.exercise.id.clone(), &ex_wrap.exercise);
+    }
+    let mut summaries = Vec::new();
+    for eblock in &jday.eblocks {
+        if let Some(ex) = ex_map.get(&eblock.eid) {
+            // Find the heaviest set: max weight, then max reps
+            let mut max_weight = 0.0;
+            let mut max_reps = 0;
+            for set in &eblock.sets {
+                let w = set.w.unwrap_or(0.0);
+                let r = set.r.unwrap_or(0);
+                if w > max_weight || (w == max_weight && r > max_reps) {
+                    max_weight = w;
+                    max_reps = r;
+                }
+            }
+            if max_weight > 0.0 {
+                let lb = eblock.sets.iter().any(|s| s.lb.unwrap_or(0.0) == 1.0);
+                let w_str = format_weight(max_weight, lb);
+                summaries.push(format!("#{} {}x{}", ex.name, w_str, max_reps));
+            }
+        }
+    }
+    summaries.join("; ")
+}
+
 pub fn format_workout(jday: &JDay) -> String {
     let formatted_eblocks = format_eblocks(jday);
     let re = Regex::new(r"EBLOCK:\d+").unwrap();

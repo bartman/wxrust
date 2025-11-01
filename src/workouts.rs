@@ -5,7 +5,7 @@ use crate::models;
 use chrono::{Datelike, Utc};
 
 
-pub async fn get_day(token: &str, date: &str) -> Result<String, String> {
+pub async fn get_jday(token: &str, date: &str) -> Result<models::JDay, String> {
     let claims = auth::decode_token(&token).map_err(|e| e.to_string())?;
     let uid = claims.id;
 
@@ -54,16 +54,21 @@ query {{
 
     if let Some(data) = response.data {
         if let Some(jday) = data.jday {
-            let formatted = formatters::format_workout(&jday);
-            let bw = jday.bw.unwrap_or(0.0);
-            let output = format!("{}\n@ {:.0} bw\n{}", date, bw, formatted);
-            Ok(output)
+            Ok(jday)
         } else {
             Err("No workout found for the date.".to_string())
         }
     } else {
         Err("Unexpected response.".to_string())
     }
+}
+
+pub async fn get_day(token: &str, date: &str) -> Result<String, String> {
+    let jday = get_jday(token, date).await?;
+    let formatted = formatters::format_workout(&jday);
+    let bw = jday.bw.unwrap_or(0.0);
+    let output = format!("{}\n@ {:.0} bw\n{}", date, bw, formatted);
+    Ok(output)
 }
 
 pub async fn get_dates(token: &str, from: Option<String>, count: u32, reverse: bool) -> Result<Vec<String>, String> {

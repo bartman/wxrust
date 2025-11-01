@@ -104,6 +104,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     };
                     println!("{}", workout);
                 }
+            } else if list.summary {
+                for date in dates {
+                    let jday = match workouts::get_jday(&token, &date).await {
+                        Ok(j) => j,
+                        Err(e) => {
+                            eprintln!("Error getting workout for {}: {}", date, e);
+                            continue;
+                        }
+                    };
+                    let summary = formatters::summarize_workout(&jday);
+                    println!("{} {}", date, summary);
+                }
             } else {
                 for date in dates {
                     println!("{}", date);
@@ -138,15 +150,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             };
 
-            let workout = match workouts::get_day(&token, &date).await {
-                Ok(w) => w,
-                Err(e) => {
-                    eprintln!("{}", e);
-                    std::process::exit(1);
-                }
-            };
-
-            println!("{}", workout);
+            if show.summary {
+                let jday = match workouts::get_jday(&token, &date).await {
+                    Ok(j) => j,
+                    Err(e) => {
+                        eprintln!("{}", e);
+                        std::process::exit(1);
+                    }
+                };
+                let summary = formatters::summarize_workout(&jday);
+                println!("{} {}", date, summary);
+            } else {
+                let workout = match workouts::get_day(&token, &date).await {
+                    Ok(w) => w,
+                    Err(e) => {
+                        eprintln!("{}", e);
+                        std::process::exit(1);
+                    }
+                };
+                println!("{}", workout);
+            }
         }
     }
 
