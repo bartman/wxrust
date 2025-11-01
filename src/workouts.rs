@@ -67,7 +67,7 @@ pub async fn get_day(token: &str, date: &str) -> Result<String, String> {
     let jday = get_jday(token, date).await?;
     let formatted = formatters::format_workout(&jday);
     let bw = jday.bw.unwrap_or(0.0);
-    let output = format!("{}\n@ {:.0} bw\n{}", date, bw, formatted);
+    let output = format!("{}\n@ {} bw\n{}", formatters::color_date(date), formatters::color_bw(&format!("{:.0}", bw)), formatted);
     Ok(output)
 }
 

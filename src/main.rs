@@ -16,6 +16,9 @@ struct Args {
     #[arg(short = 'a', long = "force-authentication")]
     force_auth: bool,
 
+    #[arg(long, default_value = "auto")]
+    color: String,
+
     #[command(subcommand)]
     command: Commands,
 }
@@ -60,6 +63,7 @@ struct ShowArgs {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
+    unsafe { std::env::set_var("WXRUST_COLOR", &args.color); }
 
     let home = std::env::var("HOME").unwrap_or(".".to_string());
     let token_path = format!("{}/.config/wxrust/token", home);
@@ -114,7 +118,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     };
                     let summary = formatters::summarize_workout(&jday);
-                    println!("{} {}", date, summary);
+                    println!("{} {}", formatters::color_date(&date), summary);
                 }
             } else {
                 for date in dates {
@@ -159,7 +163,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 };
                 let summary = formatters::summarize_workout(&jday);
-                println!("{} {}", date, summary);
+                println!("{} {}", formatters::color_date(&date), summary);
             } else {
                 let workout = match workouts::get_day(&token, &date).await {
                     Ok(w) => w,
