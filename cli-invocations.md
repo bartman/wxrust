@@ -32,12 +32,12 @@
 
     - general format of command
         ```
-        wxrust list [-d|--details] [-s|--summary] [-A|--all]
-        wxrust list [-d|--details] [-s|--summary] [-c|--count] <count>
-        wxrust list [-d|--details] [-s|--summary] [-y|--year] <YYYY>
-        wxrust list [-d|--details] [-s|--summary] [-m|--month] <YYYYMM> ...
-        wxrust list [-d|--details] [-s|--summary] [-b|--before] <end-date> [-c|--count] <count>
-        wxrust list [-d|--details] [-s|--summary] <range-start>-<range-end>
+        wxrust list [-r|--reverse] [-d|--details] [-s|--summary] [-A|--all]
+        wxrust list [-r|--reverse] [-d|--details] [-s|--summary] [-c|--count] <count>
+        wxrust list [-r|--reverse] [-d|--details] [-s|--summary] [-y|--year] <YYYY>
+        wxrust list [-r|--reverse] [-d|--details] [-s|--summary] [-m|--month] <YYYYMM> ...
+        wxrust list [-r|--reverse] [-d|--details] [-s|--summary] [-b|--before] <end-date> [-c|--count] <count>
+        wxrust list [-r|--reverse] [-d|--details] [-s|--summary] <range-start>-<range-end>
         ```
 
     - list all dates of workouts
