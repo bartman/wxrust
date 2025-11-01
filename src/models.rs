@@ -24,6 +24,11 @@ pub struct LoginData {
 }
 
 #[derive(Deserialize)]
+pub struct GetCalendarDaysData {
+    pub get_calendar_days: Option<Vec<i64>>,
+}
+
+#[derive(Deserialize)]
 pub struct GraphQLError {
     pub message: String,
 }

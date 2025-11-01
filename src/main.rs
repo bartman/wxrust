@@ -53,9 +53,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let token_path = format!("{}/.config/wxrust/token", home);
 
     match args.command {
-        Commands::List(list) => {
-            // Placeholder for list command
-            println!("List command: details={}, summary={}, dates={:?}", list.details, list.summary, list.dates);
+        Commands::List(_list) => {
+            let token = match auth::login(&args.credentials, &token_path).await {
+                Ok(t) => t,
+                Err(e) => {
+                    eprintln!("{}", e);
+                    std::process::exit(1);
+                }
+            };
+
+            let dates = match workouts::get_all_dates(&token).await {
+                Ok(d) => d,
+                Err(e) => {
+                    eprintln!("{}", e);
+                    std::process::exit(1);
+                }
+            };
+
+            for date in dates {
+                println!("{}", date);
+            }
         }
         Commands::Show(show) => {
             let token = match auth::login(&args.credentials, &token_path).await {

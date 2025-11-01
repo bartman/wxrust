@@ -30,6 +30,12 @@ automated tools. Key files examined:
 - Data formatting in `src/codemirror/LogTextEditor.js` for log generation.
 - No separate API documentation; details inferred from client-server interactions.
 
+You can clone the weightxreps-client code, in the project directory, to inspect it and find out how to do things...
+
+```
+git clone https://github.com/bandinopla/weightxreps-client.git weightxreps-client
+```
+
 ## Program Features
 
 - Reads credentials from `credentials.txt` (email first line, password second).

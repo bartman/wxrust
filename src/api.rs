@@ -14,9 +14,13 @@ pub async fn login_request(client: &Client, request: &GraphQLRequest) -> Result<
     Ok(body)
 }
 
-pub async fn graphql_request<T: DeserializeOwned>(token: &str, query: &str) -> Result<GraphQLResponse<T>, Box<dyn std::error::Error>> {
+pub async fn graphql_request<T: DeserializeOwned>(token: &str, query: &str, variables: Option<serde_json::Value>) -> Result<GraphQLResponse<T>, Box<dyn std::error::Error>> {
     let client = Client::new();
-    let request_body = serde_json::json!({ "query": query });
+    let request_body = if let Some(vars) = variables {
+        serde_json::json!({ "query": query, "variables": vars })
+    } else {
+        serde_json::json!({ "query": query })
+    };
     let response = client
         .post("https://weightxreps.net/api/graphql")
         .header("Authorization", format!("Bearer {}", token))
