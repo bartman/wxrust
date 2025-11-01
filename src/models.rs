@@ -13,8 +13,8 @@ pub struct LoginVariables {
 }
 
 #[derive(Deserialize)]
-pub struct GraphQLResponse {
-    pub data: Option<LoginData>,
+pub struct GraphQLResponse<T> {
+    pub data: Option<T>,
     pub errors: Option<Vec<GraphQLError>>,
 }
 
@@ -41,6 +41,7 @@ pub struct WorkoutVariables {
 }
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 pub struct WorkoutResponse {
     pub data: Option<WorkoutData>,
     pub errors: Option<Vec<GraphQLError>>,

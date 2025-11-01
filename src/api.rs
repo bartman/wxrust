@@ -1,17 +1,33 @@
 use reqwest::Client;
+use serde::de::DeserializeOwned;
+use serde_json;
 
 use crate::models::{GraphQLRequest, GraphQLResponse, WorkoutRequest, WorkoutResponse};
 
-pub async fn login_request(client: &Client, request: &GraphQLRequest) -> Result<GraphQLResponse, Box<dyn std::error::Error>> {
+pub async fn login_request(client: &Client, request: &GraphQLRequest) -> Result<GraphQLResponse<crate::models::LoginData>, Box<dyn std::error::Error>> {
     let response = client
         .post("https://weightxreps.net/api/graphql")
         .json(request)
         .send()
         .await?;
-    let body: GraphQLResponse = response.json().await?;
+    let body: GraphQLResponse<crate::models::LoginData> = response.json().await?;
     Ok(body)
 }
 
+pub async fn graphql_request<T: DeserializeOwned>(token: &str, query: &str) -> Result<GraphQLResponse<T>, Box<dyn std::error::Error>> {
+    let client = Client::new();
+    let request_body = serde_json::json!({ "query": query });
+    let response = client
+        .post("https://weightxreps.net/api/graphql")
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&request_body)
+        .send()
+        .await?;
+    let body: GraphQLResponse<T> = response.json().await?;
+    Ok(body)
+}
+
+#[allow(dead_code)]
 pub async fn workout_request(client: &Client, token: &str, request: &WorkoutRequest) -> Result<WorkoutResponse, Box<dyn std::error::Error>> {
     let response = client
         .post("https://weightxreps.net/api/graphql")
