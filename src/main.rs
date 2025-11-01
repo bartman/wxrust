@@ -6,7 +6,9 @@ mod workouts;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let token = match auth::login("credentials.txt").await {
+    let home = std::env::var("HOME").unwrap_or(".".to_string());
+    let token_path = format!("{}/.config/wxrust/token", home);
+    let token = match auth::login("credentials.txt", &token_path).await {
         Ok(t) => t,
         Err(e) => {
             eprintln!("{}", e);
@@ -22,7 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    println!("Full formatted workout:\n{}", workout);
+    println!("{}", workout);
 
     Ok(())
 }
