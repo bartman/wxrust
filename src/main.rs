@@ -70,6 +70,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             };
 
+            eprintln!("Found {} dates", dates.len());
             for date in dates {
                 println!("{}", date);
             }

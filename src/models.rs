@@ -12,10 +12,15 @@ pub struct LoginVariables {
     pub p: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct GraphQLResponse<T> {
     pub data: Option<T>,
     pub errors: Option<Vec<GraphQLError>>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct GraphQLError {
+    pub message: String,
 }
 
 #[derive(Deserialize)]
@@ -23,14 +28,19 @@ pub struct LoginData {
     pub login: String,
 }
 
-#[derive(Deserialize)]
-pub struct GetCalendarDaysData {
-    pub get_calendar_days: Option<Vec<i64>>,
+#[derive(Deserialize, Debug)]
+pub struct GetJRangeData {
+    pub jrange: Option<JRangeData>,
 }
 
-#[derive(Deserialize)]
-pub struct GraphQLError {
-    pub message: String,
+#[derive(Deserialize, Debug)]
+pub struct JRangeData {
+    pub days: Option<Vec<JRangeDayData>>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct JRangeDayData {
+    pub on: Option<String>,
 }
 
 #[derive(Serialize)]
