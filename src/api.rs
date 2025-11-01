@@ -14,8 +14,7 @@ pub async fn login_request(client: &Client, request: &GraphQLRequest) -> Result<
     Ok(body)
 }
 
-pub async fn graphql_request<T: DeserializeOwned>(token: &str, query: &str, variables: Option<serde_json::Value>) -> Result<GraphQLResponse<T>, Box<dyn std::error::Error>> {
-    let client = Client::new();
+pub async fn graphql_request<T: DeserializeOwned>(client: &Client, token: &str, query: &str, variables: Option<serde_json::Value>) -> Result<GraphQLResponse<T>, Box<dyn std::error::Error>> {
     let request_body = if let Some(vars) = variables {
         serde_json::json!({ "query": query, "variables": vars })
     } else {

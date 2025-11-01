@@ -3,9 +3,10 @@ use crate::auth;
 use crate::formatters;
 use crate::models;
 use chrono::{Datelike, Utc};
+use reqwest::Client;
 
 
-pub async fn get_jday(token: &str, date: &str) -> Result<models::JDay, String> {
+pub async fn get_jday(client: &Client, token: &str, date: &str) -> Result<models::JDay, String> {
     let claims = auth::decode_token(&token).map_err(|e| e.to_string())?;
     let uid = claims.id;
 
@@ -46,7 +47,7 @@ query {{
 }}
 "#, uid, date);
 
-    let response: models::GraphQLResponse<models::WorkoutData> = api::graphql_request(token, &query, None).await.map_err(|e| e.to_string())?;
+    let response: models::GraphQLResponse<models::WorkoutData> = api::graphql_request(client, token, &query, None).await.map_err(|e| e.to_string())?;
 
     if let Some(errors) = response.errors {
         return Err(errors.into_iter().map(|e| e.message).collect::<Vec<_>>().join("; "));
@@ -63,15 +64,15 @@ query {{
     }
 }
 
-pub async fn get_day(token: &str, date: &str) -> Result<String, String> {
-    let jday = get_jday(token, date).await?;
+pub async fn get_day(client: &Client, token: &str, date: &str) -> Result<String, String> {
+    let jday = get_jday(client, token, date).await?;
     let formatted = formatters::format_workout(&jday);
     let bw = jday.bw.unwrap_or(0.0);
     let output = format!("{}\n@ {} bw\n{}", formatters::color_date(date), formatters::color_bw(&format!("{:.0}", bw)), formatted);
     Ok(output)
 }
 
-pub async fn get_dates(token: &str, from: Option<String>, count: u32, reverse: bool) -> Result<Vec<String>, String> {
+pub async fn get_dates(client: &Client, token: &str, from: Option<String>, count: u32, reverse: bool) -> Result<Vec<String>, String> {
     let claims = auth::decode_token(&token).map_err(|e| e.to_string())?;
     let uid = claims.id;
 
@@ -92,7 +93,7 @@ query GetJRange($uid: ID!, $ymd: YMD!, $range: Int!) {
 
     let variables = serde_json::json!({ "uid": uid.to_string(), "ymd": ymd, "range": count });
 
-    let response: models::GraphQLResponse<models::GetJRangeData> = api::graphql_request(token, query, Some(variables)).await.map_err(|e| e.to_string())?;
+    let response: models::GraphQLResponse<models::GetJRangeData> = api::graphql_request(client, token, query, Some(variables)).await.map_err(|e| e.to_string())?;
 
     if let Some(errors) = response.errors {
         return Err(errors.into_iter().map(|e| e.message).collect::<Vec<_>>().join("; "));

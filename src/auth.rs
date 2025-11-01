@@ -20,7 +20,7 @@ struct CachedToken {
     exp: u64,
 }
 
-pub async fn login(credentials_path: &str, token_path: &str) -> Result<String, String> {
+pub async fn login(client: &Client, credentials_path: &str, token_path: &str) -> Result<String, String> {
     // Check if token file exists and is valid
     if let Ok(contents) = fs::read_to_string(token_path) {
         if let Ok(cached) = serde_json::from_str::<CachedToken>(&contents) {
@@ -48,8 +48,7 @@ pub async fn login(credentials_path: &str, token_path: &str) -> Result<String, S
         variables: models::LoginVariables { u: email, p: password },
     };
 
-    let client = Client::new();
-    let response = api::login_request(&client, &request).await.map_err(|e| e.to_string())?;
+    let response = api::login_request(client, &request).await.map_err(|e| e.to_string())?;
 
     if let Some(data) = response.data {
         let token = data.login;

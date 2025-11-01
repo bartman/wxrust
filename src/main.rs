@@ -5,6 +5,7 @@ mod api;
 mod workouts;
 
 use clap::{Parser, Subcommand};
+use reqwest::Client;
 
 #[derive(Parser)]
 #[command(name = "wxrust")]
@@ -70,7 +71,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match args.command {
         Commands::List(list) => {
-            let token = match auth::login(&args.credentials, &token_path).await {
+            let client = Client::new();
+            let token = match auth::login(&client, &args.credentials, &token_path).await {
                 Ok(t) => t,
                 Err(e) => {
                     eprintln!("{}", e);
@@ -89,7 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 (None, 32)
             };
 
-            let dates = match workouts::get_dates(&token, from, count, list.reverse).await {
+            let dates = match workouts::get_dates(&client, &token, from, count, list.reverse).await {
                 Ok(d) => d,
                 Err(e) => {
                     eprintln!("{}", e);
@@ -99,7 +101,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             if list.details {
                 for date in dates {
-                    let workout = match workouts::get_day(&token, &date).await {
+                    let workout = match workouts::get_day(&client, &token, &date).await {
                         Ok(w) => w,
                         Err(e) => {
                             eprintln!("Error getting workout for {}: {}", date, e);
@@ -110,7 +112,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             } else if list.summary {
                 for date in dates {
-                    let jday = match workouts::get_jday(&token, &date).await {
+                    let jday = match workouts::get_jday(&client, &token, &date).await {
                         Ok(j) => j,
                         Err(e) => {
                             eprintln!("Error getting workout for {}: {}", date, e);
@@ -127,7 +129,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         Commands::Show(show) => {
-            let token = match auth::login(&args.credentials, &token_path).await {
+            let client = Client::new();
+            let token = match auth::login(&client, &args.credentials, &token_path).await {
                 Ok(t) => t,
                 Err(e) => {
                     eprintln!("{}", e);
@@ -139,7 +142,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 d
             } else {
                 // Show last workout
-                let dates = match workouts::get_dates(&token, None, 1, false).await {
+                let dates = match workouts::get_dates(&client, &token, None, 1, false).await {
                     Ok(d) => d,
                     Err(e) => {
                         eprintln!("{}", e);
@@ -155,7 +158,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
 
             if show.summary {
-                let jday = match workouts::get_jday(&token, &date).await {
+                let jday = match workouts::get_jday(&client, &token, &date).await {
                     Ok(j) => j,
                     Err(e) => {
                         eprintln!("{}", e);
@@ -165,7 +168,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let summary = formatters::summarize_workout(&jday);
                 println!("{} {}", formatters::color_date(&date), summary);
             } else {
-                let workout = match workouts::get_day(&token, &date).await {
+                let workout = match workouts::get_day(&client, &token, &date).await {
                     Ok(w) => w,
                     Err(e) => {
                         eprintln!("{}", e);
