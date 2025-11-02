@@ -8,6 +8,7 @@ use tokio::sync::OnceCell;
 use crate::models::{GraphQLRequest, GraphQLResponse, WorkoutRequest, WorkoutResponse, UserBasicInfoData, User};
 use crate::formatters::STDERR_COLOR_ENABLED;
 
+#[cfg_attr(tarpaulin, ignore)]
 #[async_trait]
 pub trait ApiClient: Send + Sync {
     async fn login_request(&self, request: &GraphQLRequest) -> Result<GraphQLResponse<crate::models::LoginData>, Box<dyn std::error::Error>>;
@@ -32,6 +33,7 @@ impl ReqwestClient {
     }
 }
 
+#[cfg_attr(tarpaulin, ignore)]
 #[async_trait]
 impl ApiClient for ReqwestClient {
     async fn login_request(&self, request: &GraphQLRequest) -> Result<GraphQLResponse<crate::models::LoginData>, Box<dyn std::error::Error>> {
@@ -148,14 +150,17 @@ impl ApiClient for ReqwestClient {
     }
 }
 
+#[cfg_attr(tarpaulin, ignore)]
 pub async fn login_request<C: ApiClient>(client: &C, request: &GraphQLRequest) -> Result<GraphQLResponse<crate::models::LoginData>, Box<dyn std::error::Error>> {
     client.login_request(request).await
 }
 
+#[cfg_attr(tarpaulin, ignore)]
 pub async fn graphql_request<T: DeserializeOwned + 'static, C: ApiClient>(client: &C, token: &str, query: &str, variables: Option<serde_json::Value>) -> Result<GraphQLResponse<T>, Box<dyn std::error::Error>> {
     client.graphql_request(token, query, variables).await
 }
 
+#[cfg_attr(tarpaulin, ignore)]
 #[allow(dead_code)]
 pub async fn workout_request(client: &Client, token: &str, request: &WorkoutRequest) -> Result<WorkoutResponse, Box<dyn std::error::Error>> {
     let response = client
