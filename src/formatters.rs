@@ -3,7 +3,7 @@ use lazy_static::lazy_static;
 use ansi_term::Colour;
 use atty;
 
-use crate::models::{JDay, Set, Exercise, EBlock};
+use crate::models::{JDay, Set, Exercise, EBlock, User};
 
 lazy_static! {
     static ref COLOR_ENABLED: bool = {
@@ -230,4 +230,13 @@ pub fn format_workout(jday: &JDay) -> String {
         result = result.replace(&placeholder, &formatted);
     }
     result
+}
+
+pub fn render_workout(date: &str, jday: &JDay, user: &User) -> String {
+    let formatted = format_workout(jday);
+    let mut bw = jday.bw.unwrap_or(0.0);
+    if user.usekg.unwrap_or(1) != 1 {
+        bw *= 2.20462; // convert kg to lb
+    }
+    format!("{}\n@ {} bw\n{}", color_date(date), color_bw(&format!("{:.0}", bw)), formatted)
 }

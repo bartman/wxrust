@@ -7,7 +7,7 @@ mod utils;
 
 use clap::{Parser, Subcommand};
 
-use crate::api::ReqwestClient;
+use crate::api::{ReqwestClient, ApiClient};
 
 #[derive(Parser)]
 #[command(name = "wxrust")]
@@ -86,6 +86,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     std::process::exit(1);
                 }
             };
+            let user = match client.get_user_info(&token).await {
+                Ok(u) => u,
+                Err(e) => {
+                    eprintln!("{}", e);
+                    std::process::exit(1);
+                }
+            };
             let dates_to_use = if list.dates.is_empty() {
                 let (latest, oldest, count) = if list.all {
                     (None, None, 10000)
@@ -139,31 +146,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 std::process::exit(1);
             }
 
-            if list.details {
-                let (tx, mut rx) = tokio::sync::mpsc::channel(32);
-                for date in &dates_to_use {
-                    let date = date.clone();
-                    let client_clone = client.clone();
-                    let token_clone = token.clone();
-                    let tx_clone = tx.clone();
-                    tokio::spawn(async move {
-                        let result = match workouts::get_day(&client_clone, &token_clone, &date).await {
-                            Ok(w) => Some(w),
-                            Err(e) => {
-                                eprintln!("Error getting workout for {}: {}", date, e);
-                                None
-                            }
-                        };
-                        tx_clone.send(result).await.unwrap();
-                    });
-                }
-                drop(tx);
-                while let Some(result) = rx.recv().await {
-                    if let Some(workout) = result {
-                        println!("{}", workout);
-                    }
-                }
-            } else if list.summary {
+            if list.details || list.summary {
                 let (tx, mut rx) = tokio::sync::mpsc::channel(32);
                 for date in &dates_to_use {
                     let date = date.clone();
@@ -172,22 +155,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let tx_clone = tx.clone();
                     tokio::spawn(async move {
                         let result = match workouts::get_jday(&client_clone, &token_clone, &date).await {
-                            Ok(j) => {
-                                let summary = formatters::summarize_workout(&j);
-                                Some(format!("{} {}", formatters::color_date(&date), summary))
-                            }
+                            Ok(j) => Some(j),
                             Err(e) => {
                                 eprintln!("Error getting workout for {}: {}", date, e);
                                 None
                             }
                         };
-                        tx_clone.send(result).await.unwrap();
+                        tx_clone.send((date, result)).await.unwrap();
                     });
                 }
                 drop(tx);
-                while let Some(result) = rx.recv().await {
-                    if let Some(line) = result {
-                        println!("{}", line);
+                if list.details {
+                    while let Some((date, result)) = rx.recv().await {
+                        if let Some(jday) = result {
+                            let text = formatters::render_workout(&date, &jday, &user);
+                            println!("{}", text);
+                        }
+                    }
+                } else if list.summary {
+                    while let Some((date, result)) = rx.recv().await {
+                        if let Some(j) = result {
+                            let summary = formatters::summarize_workout(&j);
+                            println!("{} {}", formatters::color_date(&date), summary);
+                        }
                     }
                 }
             } else {
