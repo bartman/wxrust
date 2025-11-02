@@ -22,6 +22,15 @@ cd wxr-rs
 cargo build --release
 ```
 
+## Testing
+
+Run unit tests with `cargo test`. For end-to-end smoke tests requiring credentials, use `./smoke.py`
+
+To capture failures, if any, use this:
+```bash
+./smoke.py --work-dir tmp --output smoke.log
+```
+
 ## Setup
 
 Create `credentials.txt` in the project root with your WeightXReps email on the first line and password on the second.

@@ -89,6 +89,55 @@ You can look in `weightxreps-client/src/data/generated---db-types-and-hooks.tsx`
 - **Integration Tests**: Stubbed API calls using `mockall` for testing authentication and data retrieval without real network access.
 - **Code Coverage**: 80.25% overall coverage (256/319 lines) using `cargo-tarpaulin` after excluding API and main functions. High coverage in core modules (formatters: 83%, auth: 76%, workouts: 63%). HTML reports generated in CI via `coverage.sh` script, into `coverage/` directory.
 - **CI/CD**: GitHub Actions workflow at https://github.com/bartman/wxr-rs/actions/workflows/ci.yml that builds, tests, and generates coverage reports on every push/PR to master. Coverage dashboard at https://app.codecov.io/github/bartman/wxr-rs.
+- **Smoke Tests**: Python script `smoke.py` for end-to-end testing requiring credentials. Tests run executable with expected outputs, supporting flags for case, blank lines, and whitespace insensitivity. Includes options for listing tests (`--list`), running specific tests (`--test <name>`), and preserving work directories (`--keep-work-dir`). Captures stdout, stderr, and return codes in work directories for inspection. Example tests for `--help`, show commands, and list commands.
+
+### Smoke Test Script Details
+
+`smoke.py` is a Python script located in the project root that automates running smoke tests for the `wxrust` binary. It executes commands defined in test directories under `smoke/`, compares outputs to expected results, and reports pass/fail status.
+
+#### Test Directory Structure
+
+Each test is a subdirectory under `smoke/` (e.g., `000-help/`), containing:
+
+- `command`: Shell command to execute (with variable substitution).
+- `expected.stdout`: Expected standard output.
+- `expected.stderr`: Expected standard error (optional).
+- `expected.code`: Expected return code (optional).
+- `flags`: Key=value file for comparison flags (e.g., `ignore-case=true`).
+
+#### Command Line Options
+
+- `--target-dir <path>`: Build directory (default: `target`).
+- `--smoke-dir <path>`: Smoke tests directory (default: `smoke`).
+- `--work-dir <path>`: Temporary work directory (default: auto-generated `/tmp/{project}-{pid}`).
+- `--output <file>`: File for verbose logs (default: none, silenced).
+- `--keep-work-dir`: Keep work directory after tests (default: delete if auto-generated).
+- `--list`: List all available test names.
+- `--test <name>`: Run only the specified test.
+- `--variable <var>=<val>`: Override variables.
+- `--variables`: List all variables and their values.
+
+#### Variable Substitution
+
+Commands support `{{VARIABLE}}` placeholders. Predefined variables include `PROJECT_NAME`, `PID`, `TARGET_DIR`, `TARGET`, `PROGRAM`, `SMOKE_DIR`, `CREDENTIALS`, `WORK_DIR`, `PROGRAM_PATH`.
+
+#### Comparison Flags
+
+- `ignore-case=true`: Case-insensitive comparison.
+- `ignore-blank-lines=true`: Ignore blank lines.
+- `ignore-white-space=true`: Normalize whitespace.
+
+#### Output and Logging
+
+- Test results printed to stdout with color (PASS green, FAIL red).
+- On failure, diff written to verbose log; expected and actual file paths printed for manual diffing.
+- Actual outputs saved in `WORK_DIR/TEST_NAME/` as `output.stdout`, `output.stderr`, `output.code`.
+
+#### Usage Examples
+
+- List tests: `python3 smoke.py --list`
+- Run specific test: `python3 smoke.py --test 000-help`
+- Run all with verbose log: `python3 smoke.py --output smoke.log`
 
 ## Future Improvements
 
@@ -97,5 +146,6 @@ You can look in `weightxreps-client/src/data/generated---db-types-and-hooks.tsx`
 - Add export options (JSON, CSV).
 - Support for user profile and goals queries.
 - Enhance error handling and retry logic.
+- Fix ordering inconsistencies in `list` command outputs for smoke tests (e.g., chronological vs. reverse).
 
 

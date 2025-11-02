@@ -1,0 +1,1 @@
+{{PROGRAM_PATH}} -c {{CREDENTIALS}} list --before 2025-10-31 --count 5 --summary
