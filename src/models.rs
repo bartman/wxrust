@@ -117,5 +117,5 @@ pub struct Exercise {
     pub id: String,
     pub name: String,
     #[serde(rename = "type")]
-    pub ex_type: String,
+    pub ex_type: Option<String>,
 }
