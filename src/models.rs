@@ -119,3 +119,19 @@ pub struct Exercise {
     #[serde(rename = "type")]
     pub ex_type: Option<String>,
 }
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct User {
+    pub usekg: Option<i32>,
+}
+
+#[derive(Deserialize)]
+pub struct UserBasicInfoData {
+    #[serde(rename = "getSession")]
+    pub get_session: Option<SessionInfo>,
+}
+
+#[derive(Deserialize)]
+pub struct SessionInfo {
+    pub user: User,
+}

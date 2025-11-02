@@ -1,6 +1,6 @@
 use mockall::mock;
 use wxrust::workouts::{get_jday, get_day, get_dates};
-use wxrust::models::{GraphQLResponse, WorkoutData, JDay, EBlock, ExerciseWrapper, Exercise, Set};
+use wxrust::models::{GraphQLResponse, WorkoutData, JDay, EBlock, ExerciseWrapper, Exercise, Set, User};
 use base64::{Engine, engine::general_purpose};
 
 mock! {
@@ -11,6 +11,7 @@ mock! {
     impl wxrust::api::ApiClient for ApiClient {
         async fn login_request(&self, request: &wxrust::models::GraphQLRequest) -> Result<wxrust::models::GraphQLResponse<wxrust::models::LoginData>, Box<dyn std::error::Error>>;
         async fn graphql_request<T: serde::de::DeserializeOwned + 'static>(&self, token: &str, query: &str, variables: Option<serde_json::Value>) -> Result<wxrust::models::GraphQLResponse<T>, Box<dyn std::error::Error>>;
+        async fn get_user_info(&self, token: &str) -> Result<User, Box<dyn std::error::Error>>;
     }
 }
 
@@ -163,6 +164,10 @@ async fn test_get_day_success() {
     let token = format!("{}.{}.{}", header, payload, "signature");
 
     let mut mock_client = MockApiClient::new();
+    mock_client
+        .expect_get_user_info()
+        .times(1)
+        .returning(|_| Ok(User { usekg: Some(1) }));
     mock_client
         .expect_graphql_request::<wxrust::models::WorkoutData>()
         .times(1)

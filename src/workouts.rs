@@ -44,8 +44,12 @@ query {{
 
 pub async fn get_day<C: crate::api::ApiClient>(client: &C, token: &str, date: &str) -> Result<String, String> {
     let jday = get_jday(client, token, date).await?;
+    let user = client.get_user_info(token).await.map_err(|e| e.to_string())?;
     let formatted = formatters::format_workout(&jday);
-    let bw = jday.bw.unwrap_or(0.0);
+    let mut bw = jday.bw.unwrap_or(0.0);
+    if user.usekg.unwrap_or(1) != 1 {
+        bw *= 2.20462; // convert kg to lb
+    }
     let output = format!("{}\n@ {} bw\n{}", formatters::color_date(date), formatters::color_bw(&format!("{:.0}", bw)), formatted);
     Ok(output)
 }

@@ -3,19 +3,22 @@ use reqwest::Client;
 use serde::de::DeserializeOwned;
 use serde_json;
 use ansi_term::Colour;
+use tokio::sync::OnceCell;
 
-use crate::models::{GraphQLRequest, GraphQLResponse, WorkoutRequest, WorkoutResponse};
+use crate::models::{GraphQLRequest, GraphQLResponse, WorkoutRequest, WorkoutResponse, UserBasicInfoData, User};
 use crate::formatters::STDERR_COLOR_ENABLED;
 
 #[async_trait]
 pub trait ApiClient: Send + Sync {
     async fn login_request(&self, request: &GraphQLRequest) -> Result<GraphQLResponse<crate::models::LoginData>, Box<dyn std::error::Error>>;
     async fn graphql_request<T: DeserializeOwned + 'static>(&self, token: &str, query: &str, variables: Option<serde_json::Value>) -> Result<GraphQLResponse<T>, Box<dyn std::error::Error>>;
+    async fn get_user_info(&self, token: &str) -> Result<crate::models::User, Box<dyn std::error::Error>>;
 }
 
 pub struct ReqwestClient {
     client: Client,
     verbose: bool,
+    user_info: OnceCell<crate::models::User>,
 }
 
 impl ReqwestClient {
@@ -23,6 +26,7 @@ impl ReqwestClient {
         ReqwestClient {
             client: Client::new(),
             verbose,
+            user_info: OnceCell::new(),
         }
     }
 }
@@ -111,6 +115,35 @@ impl ApiClient for ReqwestClient {
         }
         let body: GraphQLResponse<T> = serde_json::from_str(&text)?;
         Ok(body)
+    }
+
+    async fn get_user_info(&self, token: &str) -> Result<crate::models::User, Box<dyn std::error::Error>> {
+        let user =         self.user_info.get_or_try_init(|| async {
+            let query = r#"
+            query {
+                getSession {
+                    user {
+                        usekg
+                    }
+                }
+            }
+            "#;
+            let response: GraphQLResponse<UserBasicInfoData> = self.graphql_request(token, query, None).await?;
+            if let Some(errors) = response.errors {
+                return Err::<User, Box<dyn std::error::Error>>(format!("GraphQL errors: {:?}", errors).into());
+            }
+            if let Some(data) = response.data {
+                if let Some(session) = data.get_session {
+                    Ok(session.user)
+                } else {
+                    // Default to kg if not available
+                    Ok(User { usekg: Some(1) })
+                }
+            } else {
+                Err("No data in response".into())
+            }
+        }).await?;
+        Ok(user.clone())
     }
 }
 

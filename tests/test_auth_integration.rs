@@ -2,7 +2,7 @@ use mockall::mock;
 use std::fs;
 use tempfile::TempDir;
 use wxrust::auth::login;
-use wxrust::models::{GraphQLResponse, LoginData};
+use wxrust::models::{GraphQLResponse, LoginData, User};
 use base64::{Engine, engine::general_purpose};
 
 mock! {
@@ -13,6 +13,7 @@ mock! {
     impl wxrust::api::ApiClient for ApiClient {
         async fn login_request(&self, request: &wxrust::models::GraphQLRequest) -> Result<wxrust::models::GraphQLResponse<wxrust::models::LoginData>, Box<dyn std::error::Error>>;
         async fn graphql_request<T: serde::de::DeserializeOwned + 'static>(&self, token: &str, query: &str, variables: Option<serde_json::Value>) -> Result<wxrust::models::GraphQLResponse<T>, Box<dyn std::error::Error>>;
+        async fn get_user_info(&self, token: &str) -> Result<User, Box<dyn std::error::Error>>;
     }
 }
 
