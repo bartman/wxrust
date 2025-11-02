@@ -1,5 +1,5 @@
 use mockall::mock;
-use wxrust::workouts::{get_jday, get_dates};
+use wxrust::workouts::{get_jday, get_day, get_dates};
 use wxrust::models::{GraphQLResponse, WorkoutData, JDay, EBlock, ExerciseWrapper, Exercise, Set};
 use base64::{Engine, engine::general_purpose};
 
@@ -154,4 +154,53 @@ async fn test_get_jday_graphql_error() {
     let result = get_jday(&mock_client, &token, "2023-10-01").await;
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("GraphQL error"));
+}
+
+#[tokio::test]
+async fn test_get_day_success() {
+    let header = general_purpose::URL_SAFE_NO_PAD.encode(r#"{"alg":"HS256","typ":"JWT"}"#.as_bytes());
+    let payload = general_purpose::URL_SAFE_NO_PAD.encode(r#"{"id":123,"exp":2000000000}"#.as_bytes());
+    let token = format!("{}.{}.{}", header, payload, "signature");
+
+    let mut mock_client = MockApiClient::new();
+    mock_client
+        .expect_graphql_request::<wxrust::models::WorkoutData>()
+        .times(1)
+        .returning(move |_, _, _| {
+            Ok(GraphQLResponse {
+                data: Some(WorkoutData {
+                    jday: Some(JDay {
+                        log: "Date: 2023-10-01\nEBLOCK:ex1\n".to_string(),
+                        bw: Some(180.0),
+                        eblocks: vec![EBlock {
+                            eid: "ex1".to_string(),
+                            sets: vec![Set {
+                                w: Some(135.0),
+                                r: Some(5),
+                                s: Some(1),
+                                lb: Some(0.0),
+                                rpe: None,
+                                ..Default::default()
+                            }],
+                        }],
+                        exercises: vec![ExerciseWrapper {
+                            exercise: Exercise {
+                                id: "ex1".to_string(),
+                                name: "Squat".to_string(),
+                                ex_type: Some("strength".to_string()),
+                            },
+                        }],
+                    }),
+                }),
+                errors: None,
+            })
+        });
+
+    unsafe { std::env::set_var("WXRUST_COLOR", "never"); } // Disable colors for test
+    let result = get_day(&mock_client, &token, "2023-10-01").await;
+    assert!(result.is_ok());
+    let workout = result.unwrap();
+    assert!(workout.contains("Date: 2023-10-01"));
+    assert!(workout.contains("#Squat"));
+    assert!(workout.contains("135 x 5"));
 }

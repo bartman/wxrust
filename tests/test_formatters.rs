@@ -182,3 +182,6 @@ fn test_format_workout_multiple_eblocks() {
     assert_eq!(squat_count, 1);
     assert_eq!(bench_count, 1);
 }
+
+
+
