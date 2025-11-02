@@ -84,7 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
 
             let (from, count) = if list.all {
-                (None, 1000)
+                (None, 10000)
             } else if let Some(before) = &list.before {
                 let cnt = list.count.unwrap_or(32);
                 (Some(before.clone()), cnt)
