@@ -77,7 +77,7 @@ git clone https://github.com/bandinopla/weightxreps-client.git weightxreps-clien
 - **Unit Tests**: Comprehensive test suite with 21 tests covering formatters, auth, workouts, and API stubbing. Tests are standalone, no external dependencies.
 - **Integration Tests**: Stubbed API calls using `mockall` for testing authentication and data retrieval without real network access.
 - **Code Coverage**: 54.08% overall coverage (179/331 lines) using `cargo-tarpaulin`. High coverage in core modules (formatters: 83%, auth: 76%, workouts: 63%). HTML reports generated in CI.
-- **CI/CD**: GitHub Actions workflow at https://github.com/bartman/wxr-rs/actions/workflows/ci.yml that builds, tests, and generates coverage reports on every push/PR to master.
+- **CI/CD**: GitHub Actions workflow at https://github.com/bartman/wxr-rs/actions/workflows/ci.yml that builds, tests, and generates coverage reports on every push/PR to master. Coverage dashboard at https://app.codecov.io/github/bartman/wxr-rs.
 
 ## Future Improvements
 
