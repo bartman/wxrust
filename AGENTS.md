@@ -1,10 +1,19 @@
-
 # AGENTS.md - WeightXReps Rust Client Development Session
 
 ## Session Summary
 
 This session developed a Rust program to authenticate with WeightXReps (https:weightxreps.net/) and retrieve user workouts. The program logs in using email/password from a file,
 decodes the JWT token for user ID, queries the GraphQL API for workout data, and formats the output to match the site's log format.
+
+## Recent Updates
+
+- **User Unit Preferences**: Implemented support for displaying body weight in the user's preferred units (kg or lb) based on API data.
+  - Fixed GraphQL query from `userBasicInfo` (which returned null for `usekg`) to `getSession { user { usekg } }` to fetch preferences (`usekg`: 1=kg, 0=lb).
+  - Updated `User` struct in `src/models.rs`: changed `usekg` from `bool` to `Option<i32>`.
+  - Added `SessionInfo` struct for query response handling.
+  - Modified unit conversion in `src/workouts.rs`: converts body weight from kg to lb only if `usekg != 1`; defaults to kg if data missing.
+  - Updated tests in `tests/test_api.rs`, `tests/test_auth_integration.rs`, `tests/test_workouts.rs` for new mocks, expectations, and trait methods.
+  - Feature now works: body weight displays correctly in preferred units via `cargo run -- show`.
 
 ## Key Learnings
 
@@ -54,6 +63,7 @@ git clone https://github.com/bandinopla/weightxreps-client.git weightxreps-clien
 - Formats structured JSON data into human-readable text with compression and colors.
 - Supports listing dates, detailed views, and summaries.
 - Outputs full workout logs matching site format (date, bodyweight, program, sets, URL).
+- Handles user unit preferences for body weight display (kg or lb) fetched from API.
 - CLI with subcommands, options for count, before, reverse, details, summary, color control, and date ranges (using .. separator).
 
 ## Dependencies Added
@@ -86,4 +96,5 @@ git clone https://github.com/bandinopla/weightxreps-client.git weightxreps-clien
 - Add export options (JSON, CSV).
 - Support for user profile and goals queries.
 - Enhance error handling and retry logic.
+
 
