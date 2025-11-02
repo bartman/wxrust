@@ -20,6 +20,9 @@ struct Args {
     #[arg(long, default_value = "auto")]
     color: String,
 
+    #[arg(short, long)]
+    verbose: bool,
+
     #[command(subcommand)]
     command: Commands,
 }
@@ -71,7 +74,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match args.command {
         Commands::List(list) => {
-            let client = ReqwestClient::new();
+            let client = ReqwestClient::new_with_verbose(args.verbose);
             let token = match auth::login(&client, &args.credentials, &token_path).await {
                 Ok(t) => t,
                 Err(e) => {
@@ -129,7 +132,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         Commands::Show(show) => {
-            let client = ReqwestClient::new();
+            let client = ReqwestClient::new_with_verbose(args.verbose);
             let token = match auth::login(&client, &args.credentials, &token_path).await {
                 Ok(t) => t,
                 Err(e) => {

@@ -16,6 +16,16 @@ lazy_static! {
             _ => atty::is(atty::Stream::Stdout),
         }
     };
+
+    pub static ref STDERR_COLOR_ENABLED: bool = {
+        let color_arg = std::env::var("WXRUST_COLOR").unwrap_or("auto".to_string());
+        match color_arg.as_str() {
+            "always" => true,
+            "never" => false,
+            "auto" => atty::is(atty::Stream::Stderr),
+            _ => atty::is(atty::Stream::Stderr),
+        }
+    };
 }
 
 pub fn color_date(s: &str) -> String {
