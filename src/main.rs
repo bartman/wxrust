@@ -149,7 +149,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             if list.details || list.summary {
                 let (tx, mut rx) = tokio::sync::mpsc::channel(32);
-                for date in &dates_to_use {
+                for (seq, date) in dates_to_use.iter().enumerate() {
                     let date = date.clone();
                     let client_clone = client.clone();
                     let token_clone = token.clone();
@@ -162,23 +162,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 None
                             }
                         };
-                        tx_clone.send((date, result)).await.unwrap();
+                        tx_clone.send((seq, date, result)).await.unwrap();
                     });
                 }
                 drop(tx);
-                if list.details {
-                    while let Some((date, result)) = rx.recv().await {
-                        if let Some(jday) = result {
-                            let text = formatters::render_workout(&date, &jday, &user);
-                            println!("{}", text);
+                use std::collections::BTreeMap;
+                let mut buffer: BTreeMap<usize, (String, Option<models::JDay>)> = BTreeMap::new();
+                let mut next_seq = 0;
+                while let Some((seq, date, result)) = rx.recv().await {
+                    buffer.insert(seq, (date, result));
+                    while let Some((d, r)) = buffer.remove(&next_seq) {
+                        if list.details {
+                            if let Some(jday) = r {
+                                let text = formatters::render_workout(&d, &jday, &user);
+                                println!("{}", text);
+                            }
+                        } else if list.summary {
+                            if let Some(j) = r {
+                                let summary = formatters::summarize_workout(&j);
+                                println!("{} {}", formatters::color_date(&d), summary);
+                            }
                         }
-                    }
-                } else if list.summary {
-                    while let Some((date, result)) = rx.recv().await {
-                        if let Some(j) = result {
-                            let summary = formatters::summarize_workout(&j);
-                            println!("{} {}", formatters::color_date(&date), summary);
-                        }
+                        next_seq += 1;
                     }
                 }
             } else {

@@ -66,6 +66,7 @@ You can look in `weightxreps-client/src/data/generated---db-types-and-hooks.tsx`
 - Outputs full workout logs matching site format (date, bodyweight, program, sets, URL).
 - Handles user unit preferences for body weight display (kg or lb) fetched from API.
 - CLI with subcommands, options for count, before, reverse, details, summary, color control, and date ranges (using .. separator).
+- Ensures ordered output in list commands by buffering concurrent async requests to maintain sequence.
 
 ## Dependencies Added
 
@@ -146,6 +147,5 @@ Commands support `{{VARIABLE}}` placeholders. Predefined variables include `PROJ
 - Add export options (JSON, CSV).
 - Support for user profile and goals queries.
 - Enhance error handling and retry logic.
-- Fix ordering inconsistencies in `list` command outputs for smoke tests (e.g., chronological vs. reverse).
 
 
