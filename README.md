@@ -1,4 +1,4 @@
-# WeightXReps Workout Extractor
+# wxrust - WeightXReps Workout Extractor 🦀
 
 [![codecov](https://codecov.io/gh/bartman/wxrust/branch/master/graph/badge.svg)](https://app.codecov.io/github/bartman/wxrust)
 
