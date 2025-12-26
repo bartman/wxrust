@@ -23,6 +23,7 @@ ansi_term = "0.12"
 atty = "0.2"
 lazy_static = "1.4"
 async-trait = "0.1"
+dirs = "5.0"
 
 [dev-dependencies]
 mockall = "0.12"

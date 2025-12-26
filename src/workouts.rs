@@ -2,13 +2,46 @@ use crate::api;
 use crate::auth;
 use crate::formatters;
 use crate::models;
+use crate::parsers;
 use chrono::{Datelike, Utc};
+use std::fs;
+use std::path::PathBuf;
 
+fn get_cache_dir(uid: u32) -> Result<PathBuf, String> {
+    let cache_dir = if let Ok(dir) = std::env::var("XDG_CACHE_HOME") {
+        if !dir.is_empty() {
+            PathBuf::from(dir)
+        } else {
+            std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".cache")).ok_or("No cache dir")?
+        }
+    } else {
+        std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".cache")).ok_or("No cache dir")?
+    };
+    let full = cache_dir.join("wxrust").join(uid.to_string());
+    Ok(full)
+}
+
+fn get_cache_file_path(uid: u32, date: &str) -> Result<PathBuf, String> {
+    let cache_dir = get_cache_dir(uid)?;
+    Ok(cache_dir.join(format!("{}.txt", date)))
+}
 
 pub async fn get_jday<C: crate::api::ApiClient>(client: &C, token: &str, date: &str) -> Result<models::JDay, String> {
     let claims = auth::decode_token(&token).map_err(|e| e.to_string())?;
     let uid = claims.id;
 
+    // Try to read from cache
+    if let Ok(cache_path) = get_cache_file_path(uid, date) {
+        if cache_path.exists() {
+            if let Ok(content) = fs::read_to_string(&cache_path) {
+                if let Ok(jday) = parsers::parse_workout(&content) {
+                    return Ok(jday);
+                }
+            }
+        }
+    }
+
+    // Fetch from GraphQL
     let query = format!(r#"
 query {{
   jday(uid: {}, ymd: "{}") {{
@@ -23,7 +56,8 @@ query {{
     }}
   }}
 }}
-"#, uid, date);
+"#,
+    uid, date);
 
     let response: models::GraphQLResponse<models::WorkoutData> = api::graphql_request(client, token, &query, None).await.map_err(|e| e.to_string())?;
 
@@ -33,6 +67,13 @@ query {{
 
     if let Some(data) = response.data {
         if let Some(jday) = data.jday {
+            // Cache the result
+            if let Ok(cache_path) = get_cache_file_path(uid, date) {
+                if let Some(parent) = cache_path.parent() {
+                    let _ = fs::create_dir_all(parent);
+                }
+                let _ = fs::write(&cache_path, formatters::format_workout_no_color(&jday));
+            }
             Ok(jday)
         } else {
             Err("No workout found for the date.".to_string())
@@ -43,6 +84,20 @@ query {{
 }
 
 pub async fn get_day<C: crate::api::ApiClient>(client: &C, token: &str, date: &str) -> Result<String, String> {
+    let claims = auth::decode_token(&token).map_err(|e| e.to_string())?;
+    let uid = claims.id;
+
+    // Check cache
+    if let Ok(cache_path) = get_cache_file_path(uid, date) {
+        if cache_path.exists() {
+            if let Ok(content) = fs::read_to_string(&cache_path) {
+                // Cache contains plain text, color it
+                let colored = colorize_output(&content);
+                return Ok(colored);
+            }
+        }
+    }
+
     let jday = get_jday(client, token, date).await?;
     let user = client.get_user_info(token).await.map_err(|e| e.to_string())?;
     let formatted = formatters::format_workout(&jday);
@@ -51,7 +106,28 @@ pub async fn get_day<C: crate::api::ApiClient>(client: &C, token: &str, date: &s
         bw *= 2.20462; // convert kg to lb
     }
     let output = format!("{}\n@ {} bw\n{}", formatters::color_date(date), formatters::color_bw(&format!("{:.0}", bw)), formatted);
+
+    // Cache the plain version
+    if let Ok(cache_path) = get_cache_file_path(uid, date) {
+        if let Some(parent) = cache_path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let plain = format!("{}\n@ {} bw\n{}", date, format!("{:.0}", bw), formatters::format_workout_no_color(&jday));
+        let _ = fs::write(&cache_path, plain);
+    }
+
     Ok(output)
+}
+
+fn colorize_output(plain: &str) -> String {
+    let lines: Vec<&str> = plain.lines().collect();
+    if lines.len() < 3 {
+        return plain.to_string();
+    }
+    let date_line = formatters::color_date(lines[0]);
+    let bw_line = formatters::color_bw(lines[1]);
+    let rest = lines[2..].join("\n");
+    format!("{}\n{}\n{}", date_line, bw_line, rest)
 }
 
 pub async fn get_dates<C: crate::api::ApiClient>(client: &C, token: &str, latest: Option<String>, oldest: Option<String>, count: u32, reverse: bool) -> Result<Vec<String>, String> {

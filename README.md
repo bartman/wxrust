@@ -11,6 +11,7 @@ A Rust CLI tool to extract and display workouts from the WeightXReps.net website
 - Formats output with colors matching the website editor
 - Supports detailed views, summaries, and date filtering
 - Handles JWT tokens and GraphQL queries efficiently
+- Caches workout data locally in XDG cache directory for improved performance
 
 ## Installation
 

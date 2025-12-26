@@ -68,6 +68,7 @@ You can look in `weightxreps-client/src/data/generated---db-types-and-hooks.tsx`
 - Handles user unit preferences for body weight display (kg or lb) fetched from API.
 - CLI with subcommands, options for count, before, reverse, details, summary, color control, and date ranges (using .. separator).
 - Ensures ordered output in list commands by buffering concurrent async requests to maintain sequence.
+- Local caching of rendered workouts in XDG_CACHE_HOME/wxrust/{uid}/yyyy-mm-dd.txt for offline access and performance.
 
 ## Dependencies Added
 
@@ -82,6 +83,7 @@ You can look in `weightxreps-client/src/data/generated---db-types-and-hooks.tsx`
 - `atty` (0.2) for TTY detection.
 - `lazy_static` (1.4) for global state.
 - `async-trait` (0.1) for async traits.
+- `dirs` (5.0) for XDG directory handling.
 - `mockall` (0.12) for mocking in tests (dev-dependency).
 - `tempfile` (3.0) for temporary files in tests (dev-dependency).
 

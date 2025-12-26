@@ -5,3 +5,4 @@ pub mod api;
 pub mod workouts;
 pub mod utils;
 pub mod credentials;
+pub mod parsers;

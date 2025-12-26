@@ -28,7 +28,11 @@ lazy_static! {
 }
 
 pub fn color_date(s: &str) -> String {
-    if *COLOR_ENABLED {
+    color_date_with_flag(s, *COLOR_ENABLED)
+}
+
+fn color_date_with_flag(s: &str, enabled: bool) -> String {
+    if enabled {
         Colour::RGB(157, 78, 221).paint(s).to_string()
     } else {
         s.to_string()
@@ -36,39 +40,43 @@ pub fn color_date(s: &str) -> String {
 }
 
 pub fn color_bw(s: &str) -> String {
-    if *COLOR_ENABLED {
+    color_bw_with_flag(s, *COLOR_ENABLED)
+}
+
+fn color_bw_with_flag(s: &str, enabled: bool) -> String {
+    if enabled {
         Colour::RGB(58, 134, 255).paint(s).to_string()
     } else {
         s.to_string()
     }
 }
 
-fn color_exercise(s: &str) -> String {
-    if *COLOR_ENABLED {
+fn color_exercise_with_flag(s: &str, enabled: bool) -> String {
+    if enabled {
         Colour::RGB(0, 150, 255).paint(s).to_string()
     } else {
         s.to_string()
     }
 }
 
-fn color_weight(s: &str) -> String {
-    if *COLOR_ENABLED {
+fn color_weight_with_flag(s: &str, enabled: bool) -> String {
+    if enabled {
         Colour::RGB(255, 121, 0).paint(s).to_string()
     } else {
         s.to_string()
     }
 }
 
-fn color_reps(s: &str) -> String {
-    if *COLOR_ENABLED {
+fn color_reps_with_flag(s: &str, enabled: bool) -> String {
+    if enabled {
         Colour::RGB(0, 187, 249).paint(s).to_string()
     } else {
         s.to_string()
     }
 }
 
-fn color_sets(s: &str) -> String {
-    if *COLOR_ENABLED {
+fn color_sets_with_flag(s: &str, enabled: bool) -> String {
+    if enabled {
         Colour::RGB(241, 91, 181).paint(s).to_string()
     } else {
         s.to_string()
@@ -85,21 +93,26 @@ pub fn format_weight(w: f32, lb: bool) -> String {
     }
 }
 
+#[allow(dead_code)]
 pub fn format_set(set: &Set) -> String {
+    format_set_with_flag(set, *COLOR_ENABLED)
+}
+
+fn format_set_with_flag(set: &Set, enabled: bool) -> String {
     let w = set.w.unwrap_or(0.0);
     let r = set.r.unwrap_or(0);
     let s = set.s.unwrap_or(1);
     let rpe = set.rpe.unwrap_or(0.0);
     let lb = set.lb.unwrap_or(0.0) == 1.0;
-    let w_str = color_weight(&format_weight(w, lb));
+    let w_str = color_weight_with_flag(&format_weight(w, lb), enabled);
     let mut line = w_str;
     if r > 0 {
         line += " x ";
-        line += &color_reps(&r.to_string());
+        line += &color_reps_with_flag(&r.to_string(), enabled);
     }
     if s > 1 {
         line += " x ";
-        line += &color_sets(&s.to_string());
+        line += &color_sets_with_flag(&s.to_string(), enabled);
     }
     if rpe > 0.0 {
         line += &format!(" @{}", rpe);
@@ -112,13 +125,18 @@ pub fn format_set(set: &Set) -> String {
     line
 }
 
+#[allow(dead_code)]
 pub fn compress_sets(sets: &[Set]) -> Vec<String> {
+    compress_sets_with_flag(sets, *COLOR_ENABLED)
+}
+
+fn compress_sets_with_flag(sets: &[Set], enabled: bool) -> Vec<String> {
     let mut compressed = Vec::new();
     let mut i = 0;
     while i < sets.len() {
         let set = &sets[i];
         if set.set_type.unwrap_or(0) != 0 {
-            compressed.push(format_set(set));
+            compressed.push(format_set_with_flag(set, enabled));
             i += 1;
             continue;
         }
@@ -139,8 +157,8 @@ pub fn compress_sets(sets: &[Set]) -> Vec<String> {
             j += 1;
         }
         if same_weight.len() > 1 {
-            let w_str = color_weight(&format_weight(w, lb));
-            let r_str = same_weight.iter().map(|&r| color_reps(&r.to_string())).collect::<Vec<_>>().join(", ");
+            let w_str = color_weight_with_flag(&format_weight(w, lb), enabled);
+            let r_str = same_weight.iter().map(|&r| color_reps_with_flag(&r.to_string(), enabled)).collect::<Vec<_>>().join(", ");
             let mut line = format!("{} x {}", w_str, r_str);
             if rpe > 0.0 {
                 line += &format!(" @{}", rpe);
@@ -160,8 +178,8 @@ pub fn compress_sets(sets: &[Set]) -> Vec<String> {
                 j += 1;
             }
             if same_rep.len() > 1 {
-                let w_str = same_rep.iter().map(|&w| color_weight(&format_weight(w, lb))).collect::<Vec<_>>().join(", ");
-                let r_str = color_reps(&r.to_string());
+                let w_str = same_rep.iter().map(|&w| color_weight_with_flag(&format_weight(w, lb), enabled)).collect::<Vec<_>>().join(", ");
+                let r_str = color_reps_with_flag(&r.to_string(), enabled);
                 let mut line = format!("{} x {}", w_str, r_str);
                 if rpe > 0.0 {
                     line += &format!(" @{}", rpe);
@@ -169,7 +187,7 @@ pub fn compress_sets(sets: &[Set]) -> Vec<String> {
                 compressed.push(line);
                 i = j;
             } else {
-                compressed.push(format_set(set));
+                compressed.push(format_set_with_flag(set, enabled));
                 i += 1;
             }
         }
@@ -177,15 +195,20 @@ pub fn compress_sets(sets: &[Set]) -> Vec<String> {
     compressed
 }
 
+#[allow(dead_code)]
 pub fn format_single_eblock(jday: &JDay, eblock: &EBlock) -> String {
+    format_single_eblock_with_flag(jday, eblock, *COLOR_ENABLED)
+}
+
+fn format_single_eblock_with_flag(jday: &JDay, eblock: &EBlock, enabled: bool) -> String {
     let mut ex_map: HashMap<String, &Exercise> = HashMap::new();
     for ex_wrap in &jday.exercises {
         ex_map.insert(ex_wrap.exercise.id.clone(), &ex_wrap.exercise);
     }
     let mut lines = Vec::new();
     if let Some(ex) = ex_map.get(&eblock.eid) {
-        lines.push("#".to_string() + &color_exercise(&ex.name));
-        lines.extend(compress_sets(&eblock.sets));
+        lines.push("#".to_string() + &color_exercise_with_flag(&ex.name, enabled));
+        lines.extend(compress_sets_with_flag(&eblock.sets, enabled));
     }
     lines.join("\n")
 }
@@ -193,6 +216,10 @@ pub fn format_single_eblock(jday: &JDay, eblock: &EBlock) -> String {
 
 
 pub fn summarize_workout(jday: &JDay) -> String {
+    summarize_workout_with_flag(jday, *COLOR_ENABLED)
+}
+
+fn summarize_workout_with_flag(jday: &JDay, enabled: bool) -> String {
     let mut ex_map: HashMap<String, &Exercise> = HashMap::new();
     for ex_wrap in &jday.exercises {
         ex_map.insert(ex_wrap.exercise.id.clone(), &ex_wrap.exercise);
@@ -213,9 +240,9 @@ pub fn summarize_workout(jday: &JDay) -> String {
             }
             if max_weight > 0.0 {
                 let lb = eblock.sets.iter().any(|s| s.lb.unwrap_or(0.0) == 1.0);
-                let w_str = color_weight(&format_weight(max_weight, lb));
-                let r_str = color_reps(&max_reps.to_string());
-                summaries.push(format!("#{}  {}x{}", color_exercise(&ex.name), w_str, r_str));
+                let w_str = color_weight_with_flag(&format_weight(max_weight, lb), enabled);
+                let r_str = color_reps_with_flag(&max_reps.to_string(), enabled);
+                summaries.push(format!("#{}  {}x{}", color_exercise_with_flag(&ex.name, enabled), w_str, r_str));
             }
         }
     }
@@ -223,20 +250,32 @@ pub fn summarize_workout(jday: &JDay) -> String {
 }
 
 pub fn format_workout(jday: &JDay) -> String {
+    format_workout_with_flag(jday, *COLOR_ENABLED)
+}
+
+fn format_workout_with_flag(jday: &JDay, enabled: bool) -> String {
     let mut result = jday.log.clone();
     for eblock in &jday.eblocks {
-        let formatted = format_single_eblock(jday, eblock);
+        let formatted = format_single_eblock_with_flag(jday, eblock, enabled);
         let placeholder = format!("EBLOCK:{}", eblock.eid);
         result = result.replace(&placeholder, &formatted);
     }
     result
 }
 
+pub fn format_workout_no_color(jday: &JDay) -> String {
+    format_workout_with_flag(jday, false)
+}
+
 pub fn render_workout(date: &str, jday: &JDay, user: &User) -> String {
-    let formatted = format_workout(jday);
+    render_workout_with_flag(date, jday, user, *COLOR_ENABLED)
+}
+
+fn render_workout_with_flag(date: &str, jday: &JDay, user: &User, enabled: bool) -> String {
+    let formatted = format_workout_with_flag(jday, enabled);
     let mut bw = jday.bw.unwrap_or(0.0);
     if user.usekg.unwrap_or(1) != 1 {
         bw *= 2.20462; // convert kg to lb
     }
-    format!("{}\n@ {} bw\n{}", color_date(date), color_bw(&format!("{:.0}", bw)), formatted)
+    format!("{}\n@ {} bw\n{}", color_date_with_flag(date, enabled), color_bw_with_flag(&format!("{:.0}", bw), enabled), formatted)
 }

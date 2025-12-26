@@ -4,6 +4,7 @@ mod auth;
 mod api;
 mod workouts;
 mod utils;
+mod parsers;
 
 use clap::{Parser, Subcommand};
 
@@ -75,8 +76,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     unsafe { std::env::set_var("WXRUST_COLOR", &args.color); }
 
-    let home = std::env::var("HOME").unwrap_or(".".to_string());
-    let token_path = format!("{}/.config/wxrust/token", home);
+    let token_path = if let Some(config_dir) = dirs::config_dir() {
+        config_dir.join("wxrust").join("token").to_string_lossy().to_string()
+    } else {
+        // Fallback
+        let home = std::env::var("HOME").unwrap_or(".".to_string());
+        format!("{}/.config/wxrust/token", home)
+    };
 
     // Set credentials path if provided
     if let Some(path) = &args.credentials {
@@ -87,12 +93,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let credentials_path = match credentials::get_credentials_path() {
         Ok(p) => p,
         Err(e) => {
-            let xdg_config = std::env::var("XDG_CONFIG_HOME").unwrap_or_else(|_| format!("{}/.config", home));
             eprintln!("ERROR: {}", e);
             eprintln!();
             eprintln!("Please create it with email on first line and password on second line at one of these locations:");
-            eprintln!("- {}/wxrust/credentials.txt", xdg_config);
-            eprintln!("- {}/.config/wxrust/credentials.txt", home);
+            if let Some(config_dir) = dirs::config_dir() {
+                eprintln!("- {}", config_dir.join("wxrust").join("credentials.txt").display());
+            }
+            if let Ok(home) = std::env::var("HOME") {
+                eprintln!("- {}/.config/wxrust/credentials.txt", home);
+            }
             eprintln!("- ./credentials.txt");
             std::process::exit(1);
         }
