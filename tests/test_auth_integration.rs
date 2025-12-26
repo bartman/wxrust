@@ -2,6 +2,7 @@ use mockall::mock;
 use std::fs;
 use tempfile::TempDir;
 use wxrust::auth::login;
+use wxrust::credentials;
 use wxrust::models::{GraphQLResponse, LoginData, User};
 use base64::{Engine, engine::general_purpose};
 
@@ -41,7 +42,10 @@ async fn test_login_success() {
 
     let token_path = temp_dir.path().join("token");
 
-    let result = login(&mock_client, &credentials_path.to_string_lossy(), &token_path.to_string_lossy()).await;
+    credentials::set_credentials_path(&credentials_path.to_string_lossy());
+    let credentials_path = credentials::get_credentials_path().unwrap();
+
+    let result = login(&mock_client, &credentials_path.as_str(), &token_path.to_string_lossy()).await;
     assert!(result.is_ok());
     let returned_token = result.unwrap();
     assert!(returned_token.starts_with(&header));
@@ -69,7 +73,10 @@ async fn test_login_invalid_credentials() {
 
     let token_path = temp_dir.path().join("token");
 
-    let result = login(&mock_client, &credentials_path.to_string_lossy(), &token_path.to_string_lossy()).await;
+    credentials::set_credentials_path(&credentials_path.to_string_lossy());
+    let credentials_path = credentials::get_credentials_path().unwrap();
+
+    let result = login(&mock_client, &credentials_path.as_str(), &token_path.to_string_lossy()).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("Invalid credentials"));
 }

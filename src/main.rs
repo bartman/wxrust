@@ -6,8 +6,8 @@ mod workouts;
 mod utils;
 
 use clap::{Parser, Subcommand};
-use std::path::Path;
 
+use wxrust::credentials;
 use crate::api::{ReqwestClient, ApiClient};
 
 #[derive(Parser)]
@@ -78,29 +78,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let home = std::env::var("HOME").unwrap_or(".".to_string());
     let token_path = format!("{}/.config/wxrust/token", home);
 
-    // Determine credentials path
-    let credentials_path: Option<String> = if let Some(path) = &args.credentials {
-        if !Path::new(path).exists() {
-            eprintln!("Credentials file '{}' not found.", path);
-            std::process::exit(1);
-        }
-        Some(path.clone())
-    } else {
-        // Check fallback locations
-        let xdg_config = std::env::var("XDG_CONFIG_HOME").unwrap_or_else(|_| format!("{}/.config", home));
-        let paths = vec![
-            format!("{}/wxrust/credentials.txt", xdg_config),
-            format!("{}/.config/wxrust/credentials.txt", home),
-            "credentials.txt".to_string(),
-        ];
-        paths.into_iter().find(|p| Path::new(p).exists())
-    };
+    // Set credentials path if provided
+    if let Some(path) = &args.credentials {
+        credentials::set_credentials_path(path);
+    }
 
-    let credentials_path = match credentials_path {
-        Some(p) => p,
-        None => {
+    // Ensure credentials path is available
+    let credentials_path = match credentials::get_credentials_path() {
+        Ok(p) => p,
+        Err(e) => {
             let xdg_config = std::env::var("XDG_CONFIG_HOME").unwrap_or_else(|_| format!("{}/.config", home));
-            eprintln!("Credentials file not found. Please create it with email on first line and password on second line at one of these locations:");
+            eprintln!("ERROR: {}", e);
+            eprintln!();
+            eprintln!("Please create it with email on first line and password on second line at one of these locations:");
             eprintln!("- {}/wxrust/credentials.txt", xdg_config);
             eprintln!("- {}/.config/wxrust/credentials.txt", home);
             eprintln!("- ./credentials.txt");
@@ -111,7 +101,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match args.command {
         Commands::List(list) => {
             let client = ReqwestClient::new_with_verbose(args.verbose);
-            let token = match auth::login(&client, &credentials_path, &token_path).await {
+            let token = match auth::login(&client, &credentials_path.as_str(), &token_path).await {
                 Ok(t) => t,
                 Err(e) => {
                     eprintln!("{}", e);
@@ -225,7 +215,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Commands::Show(show) => {
             let client = ReqwestClient::new_with_verbose(args.verbose);
-            let token = match auth::login(&client, &credentials_path, &token_path).await {
+            let token = match auth::login(&client, &credentials_path.as_str(), &token_path).await {
                 Ok(t) => t,
                 Err(e) => {
                     eprintln!("{}", e);
