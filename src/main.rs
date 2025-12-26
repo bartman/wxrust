@@ -6,6 +6,7 @@ mod workouts;
 mod utils;
 
 use clap::{Parser, Subcommand};
+use std::path::Path;
 
 use crate::api::{ReqwestClient, ApiClient};
 
@@ -13,8 +14,8 @@ use crate::api::{ReqwestClient, ApiClient};
 #[command(name = "wxrust")]
 #[command(about = "WeightXReps Rust client")]
 struct Args {
-    #[arg(short, long, default_value = "credentials.txt")]
-    credentials: String,
+    #[arg(short, long)]
+    credentials: Option<String>,
 
     #[arg(short = 'a', long = "force-authentication")]
     force_auth: bool,
@@ -77,10 +78,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let home = std::env::var("HOME").unwrap_or(".".to_string());
     let token_path = format!("{}/.config/wxrust/token", home);
 
+    // Determine credentials path
+    let credentials_path: Option<String> = if let Some(path) = &args.credentials {
+        if !Path::new(path).exists() {
+            eprintln!("Credentials file '{}' not found.", path);
+            std::process::exit(1);
+        }
+        Some(path.clone())
+    } else {
+        // Check fallback locations
+        let xdg_config = std::env::var("XDG_CONFIG_HOME").unwrap_or_else(|_| format!("{}/.config", home));
+        let paths = vec![
+            format!("{}/wxrust/credentials.txt", xdg_config),
+            format!("{}/.config/wxrust/credentials.txt", home),
+            "credentials.txt".to_string(),
+        ];
+        paths.into_iter().find(|p| Path::new(p).exists())
+    };
+
+    let credentials_path = match credentials_path {
+        Some(p) => p,
+        None => {
+            let xdg_config = std::env::var("XDG_CONFIG_HOME").unwrap_or_else(|_| format!("{}/.config", home));
+            eprintln!("Credentials file not found. Please create it with email on first line and password on second line at one of these locations:");
+            eprintln!("- {}/wxrust/credentials.txt", xdg_config);
+            eprintln!("- {}/.config/wxrust/credentials.txt", home);
+            eprintln!("- ./credentials.txt");
+            std::process::exit(1);
+        }
+    };
+
     match args.command {
         Commands::List(list) => {
             let client = ReqwestClient::new_with_verbose(args.verbose);
-            let token = match auth::login(&client, &args.credentials, &token_path).await {
+            let token = match auth::login(&client, &credentials_path, &token_path).await {
                 Ok(t) => t,
                 Err(e) => {
                     eprintln!("{}", e);
@@ -194,7 +225,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Commands::Show(show) => {
             let client = ReqwestClient::new_with_verbose(args.verbose);
-            let token = match auth::login(&client, &args.credentials, &token_path).await {
+            let token = match auth::login(&client, &credentials_path, &token_path).await {
                 Ok(t) => t,
                 Err(e) => {
                     eprintln!("{}", e);

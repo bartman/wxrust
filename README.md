@@ -33,13 +33,18 @@ To capture failures, if any, use this:
 
 ## Setup
 
-Create `credentials.txt` in the project root with your WeightXReps email on the first line and password on the second.
+Create a `credentials.txt` file with your WeightXReps account email on the first line and password on the second. The program looks for this file in the following locations (in order):
+
+- The path specified with `--credentials` option (if provided)
+- `$XDG_CONFIG_HOME/wxrust/credentials.txt` (or `~/.config/wxrust/credentials.txt` if `XDG_CONFIG_HOME` is not set)
+- `~/.config/wxrust/credentials.txt`
+- `./credentials.txt` (in the current working directory)
 
 ## Usage
 
 ### Global Options
 
-- `--credentials <file>`: Path to credentials file (default: `credentials.txt`)
+- `--credentials <file>`: Path to credentials file (optional, falls back to standard locations)
 - `--force-authentication`: Force re-login, ignore cached token
 - `--color <always|never|auto>`: Control color output (default: auto, based on TTY)
 

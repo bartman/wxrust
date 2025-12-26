@@ -8,7 +8,7 @@ Commands:
   help  Print this message or the help of the given subcommand(s)
 
 Options:
-  -c, --credentials <CREDENTIALS>  [default: credentials.txt]
+  -c, --credentials <CREDENTIALS>  
   -a, --force-authentication       
       --color <COLOR>              [default: auto]
   -v, --verbose                    

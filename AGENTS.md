@@ -58,7 +58,7 @@ You can look in `weightxreps-client/src/data/generated---db-types-and-hooks.tsx`
 
 ## Program Features
 
-- Reads credentials from `credentials.txt` (email first line, password second).
+- Reads credentials from `credentials.txt` (email first line, password second), checking multiple standard locations if --credentials not specified.
 - Authenticates and caches JWT token in `~/.config/wxrust/token`.
 - Decodes token to extract user ID.
 - Queries individual workouts (`JDay`) or date ranges (`jrange`).
