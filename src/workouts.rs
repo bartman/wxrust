@@ -2,7 +2,6 @@ use crate::api;
 use crate::auth;
 use crate::formatters;
 use crate::models;
-use crate::parsers;
 use chrono::{Datelike, Utc};
 use std::fs;
 use std::path::PathBuf;
@@ -35,7 +34,7 @@ pub async fn get_jday<C: crate::api::ApiClient>(client: &C, token: &str, date: &
     if let Ok(cache_path) = get_cache_file_path(uid, date) {
         if cache_path.exists() {
             if let Ok(content) = fs::read_to_string(&cache_path) {
-                if let Ok(jday) = parsers::parse_workout(&content) {
+                if let Ok(jday) = serde_json::from_str::<models::JDay>(&content) {
                     if verbose {
                         println!("\x1b[34mgetting {} from cache {}\x1b[0m", date, cache_path.display());
                     }
@@ -109,7 +108,7 @@ query {{
                 if let Some(parent) = cache_path.parent() {
                     let _ = fs::create_dir_all(parent);
                 }
-                let _ = fs::write(&cache_path, formatters::format_workout_no_color(&jday));
+                let _ = fs::write(&cache_path, serde_json::to_string(&jday).unwrap_or_default());
             }
             Ok(jday)
         } else {

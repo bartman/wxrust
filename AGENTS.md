@@ -68,7 +68,7 @@ You can look in `weightxreps-client/src/data/generated---db-types-and-hooks.tsx`
 - Handles user unit preferences for body weight display (kg or lb) fetched from API.
 - CLI with subcommands, options for count, before, reverse, details, summary, color control, and date ranges (using .. separator).
 - Ensures ordered output in list commands by buffering concurrent async requests to maintain sequence.
-- Local caching of rendered workouts in XDG_CACHE_HOME/wxrust/{uid}/yyyy-mm-dd.txt for offline access and performance.
+- Local caching of structured workout data in XDG_CACHE_HOME/wxrust/{uid}/yyyy-mm-dd.json for offline access and performance.
 
 ## Dependencies Added
 
@@ -146,7 +146,6 @@ Commands support `{{VARIABLE}}` placeholders. Predefined variables include `PROJ
 ## Future Improvements
 
 - Add support for year/month range queries.
-- Implement caching for workout data.
 - Add export options (JSON, CSV).
 - Support for user profile and goals queries.
 - Enhance error handling and retry logic.

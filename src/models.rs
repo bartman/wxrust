@@ -67,7 +67,7 @@ pub struct WorkoutData {
     pub jday: Option<JDay>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[allow(dead_code)]
 pub struct JDay {
     pub log: String,
@@ -75,15 +75,29 @@ pub struct JDay {
     pub eblocks: Vec<EBlock>,
     pub exercises: Vec<ExerciseWrapper>,
 }
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[allow(dead_code)]
+pub struct ExerciseWrapper {
+    pub exercise: Exercise,
+}
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[allow(dead_code)]
+pub struct Exercise {
+    pub id: String,
+    pub name: String,
+    #[serde(rename = "type")]
+    pub ex_type: Option<String>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[allow(dead_code)]
 pub struct EBlock {
     pub eid: String,
     pub sets: Vec<Set>,
 }
 
-#[derive(Deserialize, Debug, Default, Clone)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[allow(dead_code)]
 pub struct Set {
     pub w: Option<f32>,
@@ -91,33 +105,8 @@ pub struct Set {
     pub s: Option<u32>,
     pub lb: Option<f32>,
     pub rpe: Option<f32>,
-    pub pr: Option<i32>,
-    pub est1rm: Option<f32>,
-    pub eff: Option<f32>,
-    pub int: Option<f32>,
-    #[serde(rename = "type")]
-    pub set_type: Option<i32>,
-    pub t: Option<f32>,
-    pub d: Option<f32>,
-    pub dunit: Option<String>,
-    pub speed: Option<f32>,
-    pub force: Option<f32>,
     pub c: Option<String>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-#[allow(dead_code)]
-pub struct ExerciseWrapper {
-    pub exercise: Exercise,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-#[allow(dead_code)]
-pub struct Exercise {
-    pub id: String,
-    pub name: String,
-    #[serde(rename = "type")]
-    pub ex_type: Option<String>,
+    pub set_type: Option<u32>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
