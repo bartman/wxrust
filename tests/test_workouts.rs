@@ -23,6 +23,41 @@ mock! {
 }
 
 #[tokio::test]
+async fn test_get_jday_graphql_error() {
+    let _guard = ENV_MUTEX.lock().unwrap();
+    // Set up test cache directory
+    let temp_dir = TempDir::new().unwrap();
+    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
+    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+
+    let header = general_purpose::URL_SAFE_NO_PAD.encode(r#"{"alg":"HS256","typ":"JWT"}"#.as_bytes());
+    let payload = general_purpose::URL_SAFE_NO_PAD.encode(r#"{"id":123,"exp":2000000000}"#.as_bytes());
+    let token = format!("{}.{}.{}", header, payload, "signature");
+
+    let mut mock_client = MockApiClient::new();
+    mock_client
+        .expect_graphql_request::<wxrust::models::WorkoutData>()
+        .times(1)
+        .returning(|_, _, _| {
+            Ok(GraphQLResponse {
+                data: None,
+                errors: Some(vec![wxrust::models::GraphQLError { message: "GraphQL error".to_string() }]),
+            })
+        });
+
+    let result = get_jday(&mock_client, &token, "2023-10-01", false).await;
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("GraphQL error"));
+
+    // Restore original XDG_CACHE_HOME
+    if let Ok(original) = original_xdg_cache {
+        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+    } else {
+        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+    }
+}
+
+#[tokio::test]
 async fn test_get_jday_success() {
     let _guard = ENV_MUTEX.lock().unwrap();
     // Set up test cache directory
@@ -68,7 +103,7 @@ async fn test_get_jday_success() {
             })
         });
 
-    let result = get_jday(&mock_client, &token, "2023-10-01").await;
+    let result = get_jday(&mock_client, &token, "2023-10-01", false).await;
     assert!(result.is_ok());
     let jday = result.unwrap();
     assert_eq!(jday.log, "Date: 2023-10-01");
@@ -105,9 +140,30 @@ async fn test_get_jday_no_workout() {
             })
         });
 
-    let result = get_jday(&mock_client, &token, "2023-10-01").await;
+    let result = get_jday(&mock_client, &token, "2023-10-01", false).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("No workout found"));
+
+    // Restore original XDG_CACHE_HOME
+    if let Ok(original) = original_xdg_cache {
+        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+    } else {
+        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+    }
+}
+
+#[tokio::test]
+async fn test_get_jday_invalid_token() {
+    let _guard = ENV_MUTEX.lock().unwrap();
+    // Set up test cache directory
+    let temp_dir = TempDir::new().unwrap();
+    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
+    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+
+    let token = "invalid";
+    let mock_client = MockApiClient::new();
+    let result = get_jday(&mock_client, &token, "2023-10-01", false).await;
+    assert!(result.is_err());
 
     // Restore original XDG_CACHE_HOME
     if let Ok(original) = original_xdg_cache {
@@ -181,62 +237,6 @@ async fn test_get_dates_invalid_token() {
 }
 
 #[tokio::test]
-async fn test_get_jday_invalid_token() {
-    let _guard = ENV_MUTEX.lock().unwrap();
-    // Set up test cache directory
-    let temp_dir = TempDir::new().unwrap();
-    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
-
-    let token = "invalid";
-    let mock_client = MockApiClient::new();
-    let result = get_jday(&mock_client, &token, "2023-10-01").await;
-    assert!(result.is_err());
-
-    // Restore original XDG_CACHE_HOME
-    if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
-    } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
-    }
-}
-
-#[tokio::test]
-async fn test_get_jday_graphql_error() {
-    let _guard = ENV_MUTEX.lock().unwrap();
-    // Set up test cache directory
-    let temp_dir = TempDir::new().unwrap();
-    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
-
-    let header = general_purpose::URL_SAFE_NO_PAD.encode(r#"{"alg":"HS256","typ":"JWT"}"#.as_bytes());
-    let payload = general_purpose::URL_SAFE_NO_PAD.encode(r#"{"id":123,"exp":2000000000}"#.as_bytes());
-    let token = format!("{}.{}.{}", header, payload, "signature");
-
-    let mut mock_client = MockApiClient::new();
-    mock_client
-        .expect_graphql_request::<wxrust::models::WorkoutData>()
-        .times(1)
-        .returning(|_, _, _| {
-            Ok(GraphQLResponse {
-                data: None,
-                errors: Some(vec![wxrust::models::GraphQLError { message: "GraphQL error".to_string() }]),
-            })
-        });
-
-    let result = get_jday(&mock_client, &token, "2023-10-01").await;
-    assert!(result.is_err());
-    assert!(result.unwrap_err().contains("GraphQL error"));
-
-    // Restore original XDG_CACHE_HOME
-    if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
-    } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
-    }
-}
-
-#[tokio::test]
 async fn test_get_day_success() {
     let header = general_purpose::URL_SAFE_NO_PAD.encode(r#"{"alg":"HS256","typ":"JWT"}"#.as_bytes());
     let payload = general_purpose::URL_SAFE_NO_PAD.encode(r#"{"id":123,"exp":2000000000}"#.as_bytes());
@@ -288,7 +288,7 @@ async fn test_get_day_success() {
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
     unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
 
-    let result = get_day(&mock_client, &token, "2023-10-01").await;
+    let result = get_day(&mock_client, &token, "2023-10-01", false).await;
     assert!(result.is_ok());
     let workout = result.unwrap();
     assert!(workout.contains("2023-10-01"));

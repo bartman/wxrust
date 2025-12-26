@@ -26,19 +26,56 @@ fn get_cache_file_path(uid: u32, date: &str) -> Result<PathBuf, String> {
     Ok(cache_dir.join(format!("{}.txt", date)))
 }
 
-pub async fn get_jday<C: crate::api::ApiClient>(client: &C, token: &str, date: &str) -> Result<models::JDay, String> {
+#[allow(unreachable_code)]
+pub async fn get_jday<C: crate::api::ApiClient>(client: &C, token: &str, date: &str, verbose: bool) -> Result<models::JDay, String> {
     let claims = auth::decode_token(&token).map_err(|e| e.to_string())?;
     let uid = claims.id;
 
-    // Try to read from cache
+    // Check cache
     if let Ok(cache_path) = get_cache_file_path(uid, date) {
         if cache_path.exists() {
             if let Ok(content) = fs::read_to_string(&cache_path) {
                 if let Ok(jday) = parsers::parse_workout(&content) {
+                    if verbose {
+                        println!("\x1b[34mgetting {} from cache {}\x1b[0m", date, cache_path.display());
+                    }
                     return Ok(jday);
                 }
             }
         }
+    }
+
+    let query = format!(r#"
+query {{
+  jday(uid: {}, ymd: "{}") {{
+    log
+    bw
+    eblocks {{
+      eid
+      sets {{ w r s lb rpe pr est1rm eff int type t d dunit speed force c }}
+    }}
+    exercises {{
+      exercise {{ id name type }}
+    }}
+  }}
+}}
+"#,
+    uid, date);
+
+    let response: models::GraphQLResponse<models::WorkoutData> = api::graphql_request(client, token, &query, None).await.map_err(|e| e.to_string())?;
+
+    if let Some(errors) = response.errors {
+        return Err(errors.into_iter().map(|e| e.message).collect::<Vec<_>>().join("; "));
+    }
+
+    if let Some(data) = response.data {
+        if let Some(jday) = data.jday {
+            return Ok(jday);
+        } else {
+            return Err("No workout found for the date.".to_string());
+        }
+    } else {
+        return Err("Unexpected response.".to_string());
     }
 
     // Fetch from GraphQL
@@ -83,7 +120,7 @@ query {{
     }
 }
 
-pub async fn get_day<C: crate::api::ApiClient>(client: &C, token: &str, date: &str) -> Result<String, String> {
+pub async fn get_day<C: crate::api::ApiClient>(client: &C, token: &str, date: &str, verbose: bool) -> Result<String, String> {
     let claims = auth::decode_token(&token).map_err(|e| e.to_string())?;
     let uid = claims.id;
 
@@ -91,6 +128,9 @@ pub async fn get_day<C: crate::api::ApiClient>(client: &C, token: &str, date: &s
     if let Ok(cache_path) = get_cache_file_path(uid, date) {
         if cache_path.exists() {
             if let Ok(content) = fs::read_to_string(&cache_path) {
+                if verbose {
+                    println!("\x1b[34mgetting {} from cache {}\x1b[0m", date, cache_path.display());
+                }
                 // Cache contains plain text, color it
                 let colored = colorize_output(&content);
                 return Ok(colored);
@@ -98,7 +138,7 @@ pub async fn get_day<C: crate::api::ApiClient>(client: &C, token: &str, date: &s
         }
     }
 
-    let jday = get_jday(client, token, date).await?;
+    let jday = get_jday(client, token, date, verbose).await?;
     let user = client.get_user_info(token).await.map_err(|e| e.to_string())?;
     let formatted = formatters::format_workout(&jday);
     let mut bw = jday.bw.unwrap_or(0.0);

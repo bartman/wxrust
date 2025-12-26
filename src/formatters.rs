@@ -98,6 +98,7 @@ pub fn format_set(set: &Set) -> String {
     format_set_with_flag(set, *COLOR_ENABLED)
 }
 
+#[allow(dead_code)]
 fn format_set_with_flag(set: &Set, enabled: bool) -> String {
     let w = set.w.unwrap_or(0.0);
     let r = set.r.unwrap_or(0);
@@ -213,6 +214,21 @@ fn format_single_eblock_with_flag(jday: &JDay, eblock: &EBlock, enabled: bool) -
     lines.join("\n")
 }
 
+#[allow(dead_code)]
+pub fn render_workout(date: &str, jday: &JDay, user: &User) -> String {
+    render_workout_with_flag(date, jday, user, *COLOR_ENABLED)
+}
+
+#[allow(dead_code)]
+fn render_workout_with_flag(date: &str, jday: &JDay, user: &User, enabled: bool) -> String {
+    let formatted = format_workout_with_flag(jday, enabled);
+    let mut bw = jday.bw.unwrap_or(0.0);
+    if user.usekg.unwrap_or(1) != 1 {
+        bw *= 2.20462; // convert kg to lb
+    }
+    format!("{}\n@ {} bw\n{}", color_date_with_flag(date, enabled), color_bw_with_flag(&format!("{:.0}", bw), enabled), formatted)
+}
+
 
 
 pub fn summarize_workout(jday: &JDay) -> String {
@@ -267,15 +283,3 @@ pub fn format_workout_no_color(jday: &JDay) -> String {
     format_workout_with_flag(jday, false)
 }
 
-pub fn render_workout(date: &str, jday: &JDay, user: &User) -> String {
-    render_workout_with_flag(date, jday, user, *COLOR_ENABLED)
-}
-
-fn render_workout_with_flag(date: &str, jday: &JDay, user: &User, enabled: bool) -> String {
-    let formatted = format_workout_with_flag(jday, enabled);
-    let mut bw = jday.bw.unwrap_or(0.0);
-    if user.usekg.unwrap_or(1) != 1 {
-        bw *= 2.20462; // convert kg to lb
-    }
-    format!("{}\n@ {} bw\n{}", color_date_with_flag(date, enabled), color_bw_with_flag(&format!("{:.0}", bw), enabled), formatted)
-}

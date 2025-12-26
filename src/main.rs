@@ -117,7 +117,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     std::process::exit(1);
                 }
             };
-            let user = match client.get_user_info(&token).await {
+            let _user = match client.get_user_info(&token).await {
                 Ok(u) => u,
                 Err(e) => {
                     eprintln!("{}", e);
@@ -185,32 +185,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let token_clone = token.clone();
                     let tx_clone = tx.clone();
                     tokio::spawn(async move {
-                        let result = match workouts::get_jday(&client_clone, &token_clone, &date).await {
-                            Ok(j) => Some(j),
+                        let result = match workouts::get_day(&client_clone, &token_clone, &date, args.verbose).await {
+                            Ok(text) => Some(text),
                             Err(e) => {
                                 eprintln!("Error getting workout for {}: {}", date, e);
                                 None
                             }
                         };
-                        tx_clone.send((seq, date, result)).await.unwrap();
+                        tx_clone.send((seq, date.clone(), result)).await.unwrap();
                     });
                 }
                 drop(tx);
                 use std::collections::BTreeMap;
-                let mut buffer: BTreeMap<usize, (String, Option<models::JDay>)> = BTreeMap::new();
+                let mut buffer: BTreeMap<usize, (String, Option<String>)> = BTreeMap::new();
                 let mut next_seq = 0;
                 while let Some((seq, date, result)) = rx.recv().await {
                     buffer.insert(seq, (date, result));
                     while let Some((d, r)) = buffer.remove(&next_seq) {
                         if list.details {
-                            if let Some(jday) = r {
-                                let text = formatters::render_workout(&d, &jday, &user);
+                            if let Some(text) = r {
                                 println!("{}", text);
                             }
                         } else if list.summary {
-                            if let Some(j) = r {
-                                let summary = formatters::summarize_workout(&j);
-                                println!("{} {}", formatters::color_date(&d), summary);
+                            // For summary, we still need JDay, so call get_jday separately
+                            match workouts::get_jday(&client, &token, &d, args.verbose).await {
+                                Ok(jday) => {
+                                    let summary = formatters::summarize_workout(&jday);
+                                    println!("{} {}", formatters::color_date(&d), summary);
+                                }
+                                Err(e) => {
+                                    eprintln!("Error getting workout for {}: {}", d, e);
+                                }
                             }
                         }
                         next_seq += 1;
@@ -252,7 +257,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
 
             if show.summary {
-                let jday = match workouts::get_jday(&client, &token, &date).await {
+                let jday = match workouts::get_jday(&client, &token, &date, args.verbose).await {
                     Ok(j) => j,
                     Err(e) => {
                         eprintln!("{}", e);
@@ -262,7 +267,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let summary = formatters::summarize_workout(&jday);
                 println!("{} {}", formatters::color_date(&date), summary);
             } else {
-                let workout = match workouts::get_day(&client, &token, &date).await {
+                let workout = match workouts::get_day(&client, &token, &date, args.verbose).await {
                     Ok(w) => w,
                     Err(e) => {
                         eprintln!("{}", e);
