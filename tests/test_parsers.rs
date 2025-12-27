@@ -64,7 +64,7 @@ fn test_round_trip() {
 
     // Format to full text (simulate render_workout without color)
     unsafe { std::env::set_var("WXRUST_COLOR", "never"); }
-    let user = wxrust::models::User { usekg: Some(1) };
+    let _user = wxrust::models::User { usekg: Some(1) };
     let full_formatted_text = format!("2025-01-21\n@ 215 bw\n{}", format_workout_no_color(&original_jday));
 
 
