@@ -178,6 +178,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             if list.details || list.summary {
+                let user_wants_kg = client.user_wants_kg(&token).await;
                 let (tx, mut rx) = tokio::sync::mpsc::channel(32);
                 for (seq, date) in dates_to_use.iter().enumerate() {
                     let date = date.clone();
@@ -185,8 +186,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let token_clone = token.clone();
                     let tx_clone = tx.clone();
                     tokio::spawn(async move {
-                        let result = match workouts::get_day(&client_clone, &token_clone, &date, args.verbose).await {
-                            Ok(text) => Some(text),
+                        let result = match workouts::get_jday(&client_clone, &token_clone, &date, args.verbose).await {
+                            Ok(jday) => Some(jday),
                             Err(e) => {
                                 eprintln!("Error getting workout for {}: {}", date, e);
                                 None
@@ -197,26 +198,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 drop(tx);
                 use std::collections::BTreeMap;
-                let mut buffer: BTreeMap<usize, (String, Option<String>)> = BTreeMap::new();
+                let mut buffer: BTreeMap<usize, (String, Option<models::JDay>)> = BTreeMap::new();
                 let mut next_seq = 0;
-                while let Some((seq, date, result)) = rx.recv().await {
-                    buffer.insert(seq, (date, result));
-                    while let Some((d, r)) = buffer.remove(&next_seq) {
+                while let Some((seq, new_date, new_jday)) = rx.recv().await {
+                    buffer.insert(seq, (new_date, new_jday));
+                    while let Some((date, result)) = buffer.remove(&next_seq) {
+                        let jday = match result {
+                            Some(jday) => jday,
+                            _ => continue
+                        };
+                        let fmt_date = formatters::color_date(&date);
                         if list.details {
-                            if let Some(text) = r {
-                                println!("{}", text);
-                            }
+                            let workout = formatters::format_workout(&date, &jday, user_wants_kg);
+                            println!("{}\n{}", fmt_date, workout);
                         } else if list.summary {
-                            // For summary, we still need JDay, so call get_jday separately
-                            match workouts::get_jday(&client, &token, &d, args.verbose).await {
-                                Ok(jday) => {
-                                    let summary = formatters::summarize_workout(&jday);
-                                    println!("{} {}", formatters::color_date(&d), summary);
-                                }
-                                Err(e) => {
-                                    eprintln!("Error getting workout for {}: {}", d, e);
-                                }
-                            }
+                            let summary = formatters::summarize_workout(&jday);
+                            println!("{} {}", fmt_date, summary);
                         }
                         next_seq += 1;
                     }
@@ -269,7 +266,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let summary = formatters::summarize_workout(&jday);
                 println!("{} {}", fmt_date, summary);
             } else {
-                let workout = formatters::format_workout(&jday);
+                let user_wants_kg = client.user_wants_kg(&token).await;
+                let workout = formatters::format_workout(&date, &jday, user_wants_kg);
                 println!("{}\n{}", fmt_date, workout);
             }
         }

@@ -14,6 +14,7 @@ pub trait ApiClient: Send + Sync {
     async fn login_request(&self, request: &GraphQLRequest) -> Result<GraphQLResponse<crate::models::LoginData>, Box<dyn std::error::Error>>;
     async fn graphql_request<T: DeserializeOwned + 'static>(&self, token: &str, query: &str, variables: Option<serde_json::Value>) -> Result<GraphQLResponse<T>, Box<dyn std::error::Error>>;
     async fn get_user_info(&self, token: &str) -> Result<crate::models::User, Box<dyn std::error::Error>>;
+    async fn user_wants_kg(&self, token: &str) -> bool;
 }
 
 #[derive(Clone)]
@@ -147,6 +148,14 @@ impl ApiClient for ReqwestClient {
             }
         }).await?;
         Ok(user.clone())
+    }
+
+    async fn user_wants_kg(&self, token: &str) -> bool {
+        let user = self.get_user_info(token).await;
+        match user {
+            Ok(ref u) => return u.usekg.unwrap_or(1) != 1,
+            Err(_) => return false
+        }
     }
 }
 
