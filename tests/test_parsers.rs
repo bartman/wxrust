@@ -65,14 +65,14 @@ fn test_round_trip() {
     // Format to full text (simulate render_workout without color)
     unsafe { std::env::set_var("WXRUST_COLOR", "never"); }
     let _user = wxrust::models::User { usekg: Some(1) };
-    let full_formatted_text = format!("2025-01-21\n@ 215 bw\n{}", format_workout_no_color(&original_jday));
+    let full_formatted_text = format_workout_no_color("2025-01-21", &original_jday, true);
 
 
     // Parse back
     let parsed_jday = parse_workout(&full_formatted_text).unwrap();
 
     // Format again
-    let reformatted_full_text = format!("2025-01-21\n@ 215 bw\n{}", format_workout_no_color(&parsed_jday));
+    let reformatted_full_text = format_workout_no_color("2025-01-21", &parsed_jday, true);
 
     // Should match
     assert_eq!(full_formatted_text, reformatted_full_text);

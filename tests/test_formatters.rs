@@ -129,7 +129,7 @@ fn test_format_workout() {
         exercises: vec![ex_wrapper],
     };
     unsafe { std::env::set_var("WXRUST_COLOR", "never"); }
-    let formatted = format_workout(&jday);
+    let formatted = format_workout("2023-10-01", &jday, true);
     assert!(formatted.contains("#Squat\n135 x 5"));
     assert!(formatted.contains("Date: 2023-10-01"));
     assert!(formatted.contains("Some text"));
@@ -171,7 +171,7 @@ fn test_format_workout_multiple_eblocks() {
         exercises: vec![ex_wrapper1, ex_wrapper2],
     };
     unsafe { std::env::set_var("WXRUST_COLOR", "never"); }
-    let formatted = format_workout(&jday);
+    let formatted = format_workout("2023-10-01", &jday, true);
     assert!(formatted.contains("Date: 2023-10-01"));
     assert!(formatted.contains("#Squat\n135 x 5"));
     assert!(formatted.contains("#Bench\n100 x 8"));

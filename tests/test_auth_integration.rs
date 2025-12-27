@@ -15,6 +15,7 @@ mock! {
         async fn login_request(&self, request: &wxrust::models::GraphQLRequest) -> Result<wxrust::models::GraphQLResponse<wxrust::models::LoginData>, Box<dyn std::error::Error>>;
         async fn graphql_request<T: serde::de::DeserializeOwned + 'static>(&self, token: &str, query: &str, variables: Option<serde_json::Value>) -> Result<wxrust::models::GraphQLResponse<T>, Box<dyn std::error::Error>>;
         async fn get_user_info(&self, token: &str) -> Result<User, Box<dyn std::error::Error>>;
+        async fn user_wants_kg(&self, token: &str) -> bool;
     }
 }
 
