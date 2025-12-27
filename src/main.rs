@@ -256,25 +256,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             };
 
+            let jday = match workouts::get_jday(&client, &token, &date, args.verbose).await {
+                Ok(j) => j,
+                Err(e) => {
+                    eprintln!("{}", e);
+                    std::process::exit(1);
+                }
+            };
+            let fmt_date = formatters::color_date(&date);
+
             if show.summary {
-                let jday = match workouts::get_jday(&client, &token, &date, args.verbose).await {
-                    Ok(j) => j,
-                    Err(e) => {
-                        eprintln!("{}", e);
-                        std::process::exit(1);
-                    }
-                };
                 let summary = formatters::summarize_workout(&jday);
-                println!("{} {}", formatters::color_date(&date), summary);
+                println!("{} {}", fmt_date, summary);
             } else {
-                let workout = match workouts::get_day(&client, &token, &date, args.verbose).await {
-                    Ok(w) => w,
-                    Err(e) => {
-                        eprintln!("{}", e);
-                        std::process::exit(1);
-                    }
-                };
-                println!("{}", workout);
+                let workout = formatters::format_workout(&jday);
+                println!("{}\n{}", fmt_date, workout);
             }
         }
     }
