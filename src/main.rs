@@ -268,7 +268,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             } else {
                 let user_wants_kg = client.user_wants_kg(&token).await;
                 let workout = formatters::format_workout(&date, &jday, user_wants_kg);
-                println!("{}", workout);
+                print!("{}", workout);
             }
         }
     }
