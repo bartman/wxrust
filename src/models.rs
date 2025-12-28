@@ -107,6 +107,7 @@ pub struct Set {
     pub rpe: Option<f32>,
     pub c: Option<String>,
     pub set_type: Option<u32>,
+    pub usebw: Option<i32>,
 }
 
 #[derive(Deserialize, Debug, Clone)]

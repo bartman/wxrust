@@ -95,6 +95,22 @@ pub fn format_weight(w: f32, lb: bool) -> String {
     }
 }
 
+pub fn format_weight_with_bw(w: f32, lb: bool, usebw: i32) -> String {
+    if usebw != 0 {
+        if w > 0.0 {
+            if usebw > 0 {
+                format!("BW+{}", format_weight(w, lb))
+            } else {
+                format!("BW-{}", format_weight(w, lb))
+            }
+        } else {
+            "BW".to_string()
+        }
+    } else {
+        format_weight(w, lb)
+    }
+}
+
 #[allow(dead_code)]
 pub fn format_set(set: &Set) -> String {
     format_set_internal(set, *COLOR_ENABLED)
@@ -107,7 +123,21 @@ fn format_set_internal(set: &Set, color_enabled: bool) -> String {
     let s = set.s.unwrap_or(1);
     let rpe = set.rpe.unwrap_or(0.0);
     let lb = set.lb.unwrap_or(0.0) == 1.0;
-    let w_str = color_weight_internal(&format_weight(w, lb), color_enabled);
+    let usebw = set.usebw.unwrap_or(0);
+    let line = if usebw != 0 {
+        if w > 0.0 {
+            if usebw > 0 {
+                format!("BW+{}", format_weight(w, lb))
+            } else {
+                format!("BW-{}", format_weight(w, lb))
+            }
+        } else {
+            "BW".to_string()
+        }
+    } else {
+        format_weight(w, lb)
+    };
+    let w_str = color_weight_internal(&line, color_enabled);
     let mut line = w_str;
     if r > 0 {
         line += " x ";
@@ -148,19 +178,21 @@ fn compress_sets_internal(sets: &[Set], color_enabled: bool) -> Vec<String> {
         let _s = set.s.unwrap_or(1);
         let rpe = set.rpe.unwrap_or(0.0);
         let lb = set.lb.unwrap_or(0.0) == 1.0;
+        let usebw = set.usebw.unwrap_or(0);
         // check for same weight consecutive
         let mut same_weight = vec![r];
         let mut j = i + 1;
         while j < sets.len() {
             let next = &sets[j];
-            if next.set_type.unwrap_or(0) != 0 || next.w != set.w || next.rpe != set.rpe || next.lb != set.lb || next.s != set.s {
+            if next.set_type.unwrap_or(0) != 0 || next.w != set.w || next.rpe != set.rpe || next.lb != set.lb || next.s != set.s || next.usebw != set.usebw {
                 break;
             }
             same_weight.push(next.r.unwrap_or(0));
             j += 1;
         }
         if same_weight.len() > 1 {
-            let w_str = color_weight_internal(&format_weight(w, lb), color_enabled);
+            let line = format_weight_with_bw(w, lb, usebw);
+            let w_str = color_weight_internal(&line, color_enabled);
             let r_str = same_weight.iter().map(|&r| color_reps_internal(&r.to_string(), color_enabled)).collect::<Vec<_>>().join(", ");
             let mut line = format!("{} x {}", w_str, r_str);
             if rpe > 0.0 {
@@ -174,14 +206,17 @@ fn compress_sets_internal(sets: &[Set], color_enabled: bool) -> Vec<String> {
             let mut j = i + 1;
             while j < sets.len() {
                 let next = &sets[j];
-                if next.set_type.unwrap_or(0) != 0 || next.r != set.r || next.rpe != set.rpe || next.lb != set.lb || next.s != set.s {
+                if next.set_type.unwrap_or(0) != 0 || next.r != set.r || next.rpe != set.rpe || next.lb != set.lb || next.s != set.s || next.usebw != set.usebw {
                     break;
                 }
                 same_rep.push(next.w.unwrap_or(0.0));
                 j += 1;
             }
             if same_rep.len() > 1 {
-                let w_str = same_rep.iter().map(|&w| color_weight_internal(&format_weight(w, lb), color_enabled)).collect::<Vec<_>>().join(", ");
+                let w_str = same_rep.iter().map(|&w| {
+                    let line = format_weight_with_bw(w, lb, usebw);
+                    color_weight_internal(&line, color_enabled)
+                }).collect::<Vec<_>>().join(", ");
                 let r_str = color_reps_internal(&r.to_string(), color_enabled);
                 let mut line = format!("{} x {}", w_str, r_str);
                 if rpe > 0.0 {

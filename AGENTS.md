@@ -73,6 +73,7 @@ You can look in `weightxreps-client/src/data/generated---db-types-and-hooks.tsx`
 - Bulk fetch command to download workouts from server into cache, with options for diff, force, and file import
 - Progress bars for long-running operations using indicatif
 - Side-by-side diff display using similar crate for comparing local and server workouts
+- Parsing and formatting support for RPE (@ syntax), BW exercises (BW, BW+, BW-), lb/kg units
 
 ## Dependencies Added
 
@@ -155,5 +156,8 @@ Commands support `{{VARIABLE}}` placeholders. Predefined variables include `PROJ
 - Add export options (JSON, CSV).
 - Support for user profile and goals queries.
 - Enhance error handling and retry logic.
+- Support for other set types (WxD, WxT, etc.).
+- Support for tags, time/distance sets.
+- DELETE keyword handling in cache management.
 
 

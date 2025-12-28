@@ -35,7 +35,7 @@ fn test_round_trip() {
     };
     let ex_wrapper1 = ExerciseWrapper { exercise: exercise1 };
     let sets1 = vec![
-        Set { w: Some(175.0), r: Some(10), s: Some(3), lb: Some(0.0), rpe: None, c: None, set_type: Some(0) },
+        Set { w: Some(175.0), r: Some(10), s: Some(3), lb: Some(0.0), rpe: None, c: None, set_type: Some(0), usebw: None },
     ];
     let eblock1 = EBlock {
         eid: "lat-pulldown".to_string(),
@@ -48,7 +48,7 @@ fn test_round_trip() {
     };
     let ex_wrapper2 = ExerciseWrapper { exercise: exercise2 };
     let sets2 = vec![
-        Set { w: Some(175.0), r: Some(10), s: Some(3), lb: Some(0.0), rpe: None, c: None, set_type: Some(0) },
+        Set { w: Some(175.0), r: Some(10), s: Some(3), lb: Some(0.0), rpe: None, c: None, set_type: Some(0), usebw: None },
     ];
     let eblock2 = EBlock {
         eid: "cable-low-row".to_string(),
@@ -332,4 +332,117 @@ TM: 465
     // Format back and check it matches the input
     let reformatted = format_workout_for_cache("2025-10-31", &parsed_jday);
     assert_eq!(reformatted, cache_text);
+}
+
+#[test]
+fn test_parse_rpe() {
+    // Test RPE parsing
+    let sets = parse_set_line("405 x 5 @8").unwrap();
+    assert_eq!(sets.len(), 1);
+    assert_eq!(sets[0].w, Some(405.0));
+    assert_eq!(sets[0].r, Some(5));
+    assert_eq!(sets[0].s, Some(1));
+    assert_eq!(sets[0].rpe, Some(8.0));
+    assert_eq!(sets[0].c, None);
+
+    let sets = parse_set_line("405 x 5 @7.5 hard").unwrap();
+    assert_eq!(sets.len(), 1);
+    assert_eq!(sets[0].rpe, Some(7.5));
+    assert_eq!(sets[0].c, Some("hard".to_string()));
+}
+
+#[test]
+fn test_parse_bw_exercises() {
+    // Test BW exercises
+    let sets = parse_set_line("BW x 10").unwrap();
+    assert_eq!(sets.len(), 1);
+    assert_eq!(sets[0].w, Some(0.0));
+    assert_eq!(sets[0].r, Some(10));
+    assert_eq!(sets[0].usebw, Some(1));
+
+    let sets = parse_set_line("BW+ 20 x 5").unwrap();
+    assert_eq!(sets.len(), 1);
+    assert_eq!(sets[0].w, Some(20.0));
+    assert_eq!(sets[0].r, Some(5));
+    assert_eq!(sets[0].usebw, Some(1));
+
+    let sets = parse_set_line("BW- 10 x 5").unwrap();
+    assert_eq!(sets.len(), 1);
+    assert_eq!(sets[0].w, Some(10.0));
+    assert_eq!(sets[0].r, Some(5));
+    assert_eq!(sets[0].usebw, Some(-1));
+}
+
+#[test]
+fn test_parse_units() {
+    // Test units
+    let sets = parse_set_line("405 lb x 5").unwrap();
+    assert_eq!(sets.len(), 1);
+    assert_eq!(sets[0].w, Some(405.0));
+    assert_eq!(sets[0].lb, Some(1.0));
+
+    let sets = parse_set_line("180 kg x 5").unwrap();
+    assert_eq!(sets.len(), 1);
+    assert_eq!(sets[0].w, Some(180.0));
+    assert_eq!(sets[0].lb, Some(0.0));
+}
+
+#[test]
+fn test_format_rpe() {
+    let set = Set {
+        w: Some(405.0),
+        r: Some(5),
+        s: Some(1),
+        lb: Some(0.0),
+        rpe: Some(8.0),
+        c: None,
+        set_type: Some(0),
+        usebw: None,
+    };
+    unsafe { std::env::set_var("WXRUST_COLOR", "never"); }
+    let formatted = format_set(&set);
+    assert_eq!(formatted, "405 x 5 @8");
+}
+
+#[test]
+fn test_format_bw() {
+    let set = Set {
+        w: Some(0.0),
+        r: Some(10),
+        s: Some(1),
+        lb: Some(0.0),
+        rpe: None,
+        c: None,
+        set_type: Some(0),
+        usebw: Some(1),
+    };
+    unsafe { std::env::set_var("WXRUST_COLOR", "never"); }
+    let formatted = format_set(&set);
+    assert_eq!(formatted, "BW x 10");
+
+    let set = Set {
+        w: Some(20.0),
+        r: Some(5),
+        s: Some(1),
+        lb: Some(0.0),
+        rpe: None,
+        c: None,
+        set_type: Some(0),
+        usebw: Some(1),
+    };
+    let formatted = format_set(&set);
+    assert_eq!(formatted, "BW+20 x 5");
+
+    let set = Set {
+        w: Some(10.0),
+        r: Some(5),
+        s: Some(1),
+        lb: Some(0.0),
+        rpe: None,
+        c: None,
+        set_type: Some(0),
+        usebw: Some(-1),
+    };
+    let formatted = format_set(&set);
+    assert_eq!(formatted, "BW-10 x 5");
 }
