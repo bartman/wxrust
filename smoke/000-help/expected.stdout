@@ -3,9 +3,10 @@ WeightXReps Rust client
 Usage: wxrust [OPTIONS] <COMMAND>
 
 Commands:
-  list  
-  show  
-  help  Print this message or the help of the given subcommand(s)
+  list   
+  show   
+  fetch  
+  help   Print this message or the help of the given subcommand(s)
 
 Options:
   -c, --credentials <CREDENTIALS>  
