@@ -209,3 +209,52 @@ shoulders need more work
     let reformatted = format_workout_for_cache("2025-12-18", &parsed_jday);
     assert_eq!(reformatted, cache_text);
 }
+
+#[test]
+fn test_parse_2025_10_31() {
+    let cache_text = r#"2025-10-31
+@ 100.6980 bw
+531 squat C23 W3
+TM: 465
+#safety-box-squat #sq
+135 x 10
+235 x 5
+285 x 3
+350 x 5
+405 x 3
+445 x 1, 3
+350 x 5 AMRAP
+// https://fivethreeone.app/calculator?program=NU-LTsNADPyVas5W5M3GLfhWEFCp5SWOqIcUUiiCHpqteoj23-HuJhd7xp7xyANaKBN20He3uCLvmZq5kAhvCR-QAZ-QhtCZYMDFSB2pADcBPwGOZtpD9.1v3xG.RhQJ63Rpk6MeoddCeLID3vpzHj7k.gINp3PSfyf9IRWX48XUBMcWb02yui5DX1iTmHUp1DEXUTVaq7osuFpMQPJpLhsL-TEu1v9S7hGK.8OpD7O3Lsw2bR9AWKXNXbYH.5vQQyWaZZkWN2Yx0W35gvA6vhP-AQ__"#.to_string() + "\n";
+
+    // Parse the cache text
+    let parsed_jday = parse_workout(&cache_text).unwrap();
+
+    // The parsed JDay should have the correct structure
+    assert_eq!(parsed_jday.bw, Some(100.6980));
+    assert_eq!(parsed_jday.exercises.len(), 1);
+    assert_eq!(parsed_jday.exercises[0].exercise.name, "safety-box-squat #sq");
+    assert_eq!(parsed_jday.eblocks.len(), 1);
+    assert_eq!(parsed_jday.eblocks[0].eid, "safety-box-squat #sq");
+    eprintln!("sets.len() = {}", parsed_jday.eblocks[0].sets.len());
+    for item in &parsed_jday.eblocks[0].sets {
+        eprintln!("- {} x {} x {}",
+            item.w.unwrap_or(0.0),
+            item.r.unwrap_or(0),
+            item.s.unwrap_or(0)
+        );
+    }
+    assert_eq!(parsed_jday.eblocks[0].sets.len(), 8); // 135x10, 235x5, 285x3, 350x5, 405x3, 445x1, 445x3, 350x5
+
+    // Check the compressed reps sets
+    assert_eq!(parsed_jday.eblocks[0].sets[5].w, Some(445.0));
+    assert_eq!(parsed_jday.eblocks[0].sets[5].r, Some(1));
+    assert_eq!(parsed_jday.eblocks[0].sets[5].s, Some(1));
+    assert_eq!(parsed_jday.eblocks[0].sets[6].w, Some(445.0));
+    assert_eq!(parsed_jday.eblocks[0].sets[6].r, Some(3));
+    assert_eq!(parsed_jday.eblocks[0].sets[6].s, Some(1));
+    assert_eq!(parsed_jday.eblocks[0].sets[7].c, Some("AMRAP".to_string()));
+
+    // Format back and check it matches the input
+    let reformatted = format_workout_for_cache("2025-10-31", &parsed_jday);
+    assert_eq!(reformatted, cache_text);
+}
