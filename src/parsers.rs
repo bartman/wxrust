@@ -93,21 +93,7 @@ pub fn parse_workout(text: &str) -> Result<JDay, String> {
 }
 
 fn parse_set_line(line: &str) -> Result<Vec<Set>, String> {
-    // Split by spaces, but handle comments at the end
-    let parts: Vec<&str> = line.split_whitespace().collect();
-    if parts.is_empty() {
-        return Ok(vec![]);
-    }
-
-    // Check if last part is a comment (not a number)
-    let (set_parts, comment) = if parts.len() > 3 && !parts.last().unwrap().chars().all(|c| c.is_numeric() || c == '.' || c == 'x') {
-        let comment_start = line.rfind(' ').unwrap();
-        (&line[..comment_start], Some(line[comment_start..].trim().to_string()))
-    } else {
-        (line, None)
-    };
-
-    let set_parts = set_parts.trim();
+    let set_parts = line.trim();
 
     // Check for compressed weights
     if set_parts.contains(',') {
@@ -120,7 +106,7 @@ fn parse_set_line(line: &str) -> Result<Vec<Set>, String> {
             .map(|s| s.trim().parse().map_err(|_| format!("Invalid weight: {}", s)))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let (reps, sets) = parse_reps_and_sets(rest)?;
+        let (reps, sets, comment) = parse_reps_and_sets(rest)?;
 
         let mut result = Vec::new();
         for w in weights {
@@ -138,14 +124,12 @@ fn parse_set_line(line: &str) -> Result<Vec<Set>, String> {
     } else if set_parts.contains(" x ") {
         // Like "135 x 10" or "135 x 10 x 3"
         let parts: Vec<&str> = set_parts.split(" x ").collect();
-        if parts.len() < 2 || parts.len() > 3 {
+        if parts.len() < 2 {
             return Err(format!("Invalid set format: {}", set_parts));
         }
         let weight: f32 = parts[0].trim().parse().map_err(|_| "Invalid weight")?;
-        let (reps, mut sets) = parse_reps_and_sets(parts[1])?;
-        if parts.len() == 3 {
-            sets = Some(parts[2].trim().parse().map_err(|_| "Invalid sets")?);
-        }
+        let rest = parts[1..].join(" x ");
+        let (reps, sets, comment) = parse_reps_and_sets(&rest)?;
 
         Ok(vec![Set {
             w: Some(weight),
@@ -161,18 +145,29 @@ fn parse_set_line(line: &str) -> Result<Vec<Set>, String> {
     }
 }
 
-fn parse_reps_and_sets(rest: &str) -> Result<(Option<u32>, Option<u32>), String> {
+fn parse_reps_and_sets(rest: &str) -> Result<(Option<u32>, Option<u32>, Option<String>), String> {
     let parts: Vec<&str> = rest.split_whitespace().collect();
     if parts.is_empty() {
         return Err("No reps after x".to_string());
     }
 
     let reps: u32 = parts[0].parse().map_err(|_| "Invalid reps")?;
-    let sets = if parts.len() > 1 {
-        Some(parts[1].parse().map_err(|_| "Invalid sets")?)
-    } else {
-        Some(1)
-    };
+    let mut sets = Some(1);
+    let mut comment = None;
 
-    Ok((Some(reps), sets))
+    if parts.len() > 1 {
+        if parts[1] == "x" {
+            if parts.len() < 3 {
+                return Err("Missing sets after x".to_string());
+            }
+            sets = Some(parts[2].parse().map_err(|_| "Invalid sets")?);
+            if parts.len() > 3 {
+                comment = Some(parts[3..].join(" "));
+            }
+        } else {
+            comment = Some(parts[1..].join(" "));
+        }
+    }
+
+    Ok((Some(reps), sets, comment))
 }

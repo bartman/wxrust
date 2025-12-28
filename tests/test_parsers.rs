@@ -112,3 +112,48 @@ TM: 495
     let reformatted = format_workout_no_color("2025-12-26", &parsed_jday, true);
     assert_eq!(reformatted, cache_text);
 }
+
+#[test]
+fn test_parse_2025_12_12() {
+    let cache_text = r#"2025-12-12
+@ 102.9650 bw
+531 squat C25 W3
+TM: 485
+#safety-box-squat #sq
+195 x 10
+245 x 5
+295 x 3
+375 x 5
+425 x 3
+472 x 7 hard, but rewarding
+375 x 5 AMRAP
+// https://fivethreeone.app/calculator?program=NU-LbsJADPwVNGcr2s3GPHxrK2ilAi3iiHpI26SA2h7IIg7R-jve3eRiz9gzHrlHDTGET8jBzi05N6VqzsTT6oPwBenxDakIjQp63JSUgTKwI3AjMEFNLaStf7uG8DOgQHiNl9YpagNZMGGrB5z2tzR8TvUd4i-XqD9G-SkWm.JZ1QRrNF4bJ3WZhy6zKjLtnKk1JouKwVqUeWGK2Qg4nTZ5o6Fn5az9L.b.Q7A6XTo-2Td.sq47D8JL3CyT3evfhA7CQS0PcfGoFhU95S8Iu.GdcAc_"#.to_string() + "\n";
+
+    // Parse the cache text
+    let parsed_jday = parse_workout(&cache_text).unwrap();
+
+    // The parsed JDay should have the correct structure
+    assert_eq!(parsed_jday.bw, Some(102.9650));
+    assert_eq!(parsed_jday.exercises.len(), 1);
+    assert_eq!(parsed_jday.exercises[0].exercise.name, "safety-box-squat #sq");
+    assert_eq!(parsed_jday.eblocks.len(), 1);
+    assert_eq!(parsed_jday.eblocks[0].eid, "safety-box-squat #sq");
+    assert_eq!(parsed_jday.eblocks[0].sets.len(), 7); // 195x10, 245x5, 295x3, 375x5, 425x3, 472x7, 375x5
+
+    // Check some sets
+    assert_eq!(parsed_jday.eblocks[0].sets[0].w, Some(195.0));
+    assert_eq!(parsed_jday.eblocks[0].sets[0].r, Some(10));
+    assert_eq!(parsed_jday.eblocks[0].sets[0].s, Some(1));
+    assert_eq!(parsed_jday.eblocks[0].sets[5].w, Some(472.0));
+    assert_eq!(parsed_jday.eblocks[0].sets[5].r, Some(7));
+    assert_eq!(parsed_jday.eblocks[0].sets[5].s, Some(1));
+    assert_eq!(parsed_jday.eblocks[0].sets[5].c, Some("hard, but rewarding".to_string()));
+    assert_eq!(parsed_jday.eblocks[0].sets[6].w, Some(375.0));
+    assert_eq!(parsed_jday.eblocks[0].sets[6].r, Some(5));
+    assert_eq!(parsed_jday.eblocks[0].sets[6].s, Some(1));
+    assert_eq!(parsed_jday.eblocks[0].sets[6].c, Some("AMRAP".to_string()));
+
+    // Format back and check it matches the input
+    let reformatted = format_workout_for_cache("2025-12-12", &parsed_jday);
+    assert_eq!(reformatted, cache_text);
+}
