@@ -79,7 +79,7 @@ query {{
                 if let Some(parent) = cache_path.parent() {
                     let _ = fs::create_dir_all(parent);
                 }
-                let plain = formatters::format_workout_no_color(date, &jday, true);
+                let plain = formatters::format_workout_for_cache(date, &jday);
                 let plain = plain + "\n";
                 let _ = fs::write(&cache_path, plain);
             }

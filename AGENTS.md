@@ -69,7 +69,7 @@ You can look in `weightxreps-client/src/data/generated---db-types-and-hooks.tsx`
 - CLI with subcommands, options for count, before, reverse, details, summary, color control, and date ranges (using .. separator).
 - Ensures ordered output in list commands by buffering concurrent async requests to maintain sequence.
 - Local caching of structured workout data in XDG_CACHE_HOME/wxrust/{uid}/yyyy-mm-dd.txt for offline access and performance.
-- Cache format is text, same as what is formatted for output using `format_workout_no_color`
+- Cache format is text, same as what is formatted for output using `format_workout_for_cache`
 
 ## Dependencies Added
 

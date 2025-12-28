@@ -210,6 +210,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         if list.details {
                             let workout = formatters::format_workout(&date, &jday, user_wants_kg);
                             println!("{}", workout);
+                            if !workout.ends_with('\n') {
+                                println!();
+                            }
                         } else if list.summary {
                             let fmt_date = formatters::color_date(&date);
                             let summary = formatters::summarize_workout(&jday);
@@ -269,6 +272,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let user_wants_kg = client.user_wants_kg(&token).await;
                 let workout = formatters::format_workout(&date, &jday, user_wants_kg);
                 print!("{}", workout);
+                if !workout.ends_with('\n') {
+                    println!();
+                }
             }
         }
     }

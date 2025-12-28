@@ -251,24 +251,30 @@ fn summarize_workout_internal(jday: &JDay, color_enabled: bool) -> String {
 }
 
 pub fn format_workout(date: &str, jday: &JDay, user_wants_kg: bool) -> String {
-    format_workout_internal(date, jday, user_wants_kg, *COLOR_ENABLED)
+    format_workout_internal(date, jday, user_wants_kg, 0, *COLOR_ENABLED)
 }
 
-fn format_workout_internal(date: &str, jday: &JDay, user_wants_kg: bool, color_enabled: bool) -> String {
+fn format_workout_internal(date: &str, jday: &JDay, user_wants_kg: bool, bw_precision: usize, color_enabled: bool) -> String {
     let mut result = jday.log.clone();
     for eblock in &jday.eblocks {
         let formatted = format_single_eblock_internal(jday, eblock, color_enabled);
         let placeholder = format!("EBLOCK:{}", eblock.eid);
         result = result.replace(&placeholder, &formatted);
     }
-    let mut bw = jday.bw.unwrap_or(0.0);
-    if !user_wants_kg {
-        bw *= 2.20462; // convert kg to lb
-    }
-    format!("{}\n@ {} bw\n{}", color_date_internal(date, color_enabled), color_bw_internal(&format!("{:.0}", bw), color_enabled), result)
+    let bw = jday.bw.unwrap_or(0.0);
+    let bwtxt = if user_wants_kg {
+        &format!("{:.*}", bw_precision, bw)
+    } else {
+        &format!("{:.*}", bw_precision, bw * 2.20462) // convert kg to lb
+    };
+    format!("{}\n@ {} bw\n{}", color_date_internal(date, color_enabled), color_bw_internal(bwtxt, color_enabled), result)
 }
 
+#[allow(dead_code)]
 pub fn format_workout_no_color(date: &str, jday: &JDay, user_wants_kg: bool) -> String {
-    format_workout_internal(date, jday, user_wants_kg, false)
+    format_workout_internal(date, jday, user_wants_kg, 0, false)
 }
 
+pub fn format_workout_for_cache(date: &str, jday: &JDay) -> String {
+    format_workout_internal(date, jday, true, 4, false)
+}

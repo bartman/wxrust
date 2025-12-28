@@ -79,7 +79,10 @@ pub fn parse_workout(text: &str) -> Result<JDay, String> {
     }
 
     // Build log
-    let log = log_lines.join("\n");
+    let mut log = log_lines.join("\n");
+    if !log_lines.is_empty() {
+        log += "\n";
+    }
 
     Ok(JDay {
         log,

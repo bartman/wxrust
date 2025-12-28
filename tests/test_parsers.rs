@@ -65,14 +65,14 @@ fn test_round_trip() {
     // Format to full text (simulate render_workout without color)
     unsafe { std::env::set_var("WXRUST_COLOR", "never"); }
     let _user = wxrust::models::User { usekg: Some(1) };
-    let full_formatted_text = format_workout_no_color("2025-01-21", &original_jday, true);
+    let full_formatted_text = format_workout_for_cache("2025-01-21", &original_jday);
 
 
     // Parse back
     let parsed_jday = parse_workout(&full_formatted_text).unwrap();
 
     // Format again
-    let reformatted_full_text = format_workout_no_color("2025-01-21", &parsed_jday, true);
+    let reformatted_full_text = format_workout_for_cache("2025-01-21", &parsed_jday);
 
     // Should match
     assert_eq!(full_formatted_text, reformatted_full_text);
@@ -90,10 +90,10 @@ TM: 495
 305, 360, 415 x 3
 455 x 6
 // skip: 360 x 5 AMRAP
-// https://fivethreeone.app/calculator?program=NU-LTsMwEPyVas6ryI5jle6tRTwkWgriiHpISwpFwKEx6iHyv3dsJ5fdmd2ZHe2AFmoEe.i7vXHi3EKahRc-tzvBATrgA9oIOgoGXEjqKAXYCbgJmEjTEXpsf-pO8DmiKHhKl9Y5agNlAJ55wLFv8-Ah1xdoOP8n-VfSn1KxOd5TLbCG8Ww.q.sydIU1ibH7Qq0xRVSN1qouC1PNJ.DzaVM2DP0m9.y-KfcPivvTuQ.zty7M1m0fIHhMm7tsD-xb0EN9pGWZFitaKLotXwhex3fiFQ__"#;
+// https://fivethreeone.app/calculator?program=NU-LTsMwEPyVas6ryI5jle6tRTwkWgriiHpISwpFwKEx6iHyv3dsJ5fdmd2ZHe2AFmoEe.i7vXHi3EKahRc-tzvBATrgA9oIOgoGXEjqKAXYCbgJmEjTEXpsf-pO8DmiKHhKl9Y5agNlAJ55wLFv8-Ah1xdoOP8n-VfSn1KxOd5TLbCG8Ww.q.sydIU1ibH7Qq0xRVSN1qouC1PNJ.DzaVM2DP0m9.y-KfcPivvTuQ.zty7M1m0fIHhMm7tsD-xb0EN9pGWZFitaKLotXwhex3fiFQ__"#.to_string() + "\n";
 
     // Parse the cache text
-    let parsed_jday = parse_workout(cache_text).unwrap();
+    let parsed_jday = parse_workout(&cache_text).unwrap();
 
     // The parsed JDay should have the correct structure
     assert_eq!(parsed_jday.bw, Some(105.0));
@@ -101,10 +101,10 @@ TM: 495
     assert_eq!(parsed_jday.exercises[0].exercise.name, "safety-squat #sq #SQ");
     assert_eq!(parsed_jday.eblocks.len(), 1);
     assert_eq!(parsed_jday.eblocks[0].eid, "safety-squat #sq #SQ");
-    assert_eq!(parsed_jday.eblocks[0].sets.len(), 5); // 165x10, 255x5, 305x3, 360x3, 415x3, 455x6
+    assert_eq!(parsed_jday.eblocks[0].sets.len(), 6); // 165x10, 255x5, 305x3, 360x3, 415x3, 455x6
 
     // Check the log
-    let expected_log = "531 squat C26 W2\nTM: 495\nEBLOCK:safety-squat #sq #SQ\n// skip: 360 x 5 AMRAP\n// https://fivethreeone.app/calculator?program=NU-LTsMwEPyVas6ryI5jle6tRTwkWgriiHpISwpFwKEx6iHyv3dsJ5fdmd2ZHe2AFmoEe.i7vXHi3EKahRc-tzvBATrgA9oIOgoGXEjqKAXYCbgJmEjTEXpsf-pO8DmiKHhKl9Y5agNlAJ55wLFv8-Ah1xdoOP8n-VfSn1KxOd5TLbCG8Ww.q.sydIU1ibH7Qq0xRVSN1qouC1PNJ.DzaVM2DP0m9.y-KfcPivvTuQ.zty7M1m0fIHhMm7tsD-xb0EN9pGWZFitaKLotXwhex3fiFQ__";
+    let expected_log = "531 squat C26 W2\nTM: 495\nEBLOCK:safety-squat #sq #SQ\n// skip: 360 x 5 AMRAP\n// https://fivethreeone.app/calculator?program=NU-LTsMwEPyVas6ryI5jle6tRTwkWgriiHpISwpFwKEx6iHyv3dsJ5fdmd2ZHe2AFmoEe.i7vXHi3EKahRc-tzvBATrgA9oIOgoGXEjqKAXYCbgJmEjTEXpsf-pO8DmiKHhKl9Y5agNlAJ55wLFv8-Ah1xdoOP8n-VfSn1KxOd5TLbCG8Ww.q.sydIU1ibH7Qq0xRVSN1qouC1PNJ.DzaVM2DP0m9.y-KfcPivvTuQ.zty7M1m0fIHhMm7tsD-xb0EN9pGWZFitaKLotXwhex3fiFQ__\n";
     assert_eq!(parsed_jday.log, expected_log);
 
     // Format back and check it matches the input
