@@ -53,7 +53,11 @@ fn write_cached_jday(uid: u32, date: &str, jday: &models::JDay) {
         }
         let plain = formatters::format_workout_for_cache(date, jday);
         let plain = plain + "\n";
-        let _ = fs::write(&cache_path, plain);
+        // Write to temp file then rename
+        let temp_path = cache_path.with_extension("tmp");
+        if let Ok(()) = fs::write(&temp_path, plain) {
+            let _ = fs::rename(&temp_path, &cache_path);
+        }
     }
 }
 
