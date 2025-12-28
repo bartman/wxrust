@@ -211,6 +211,89 @@ shoulders need more work
 }
 
 #[test]
+fn test_parse_set_line_examples() {
+    // 405               - ( Set { w=405, r=1, s=1, c="" } )
+    let sets = parse_set_line("405").unwrap();
+    assert_eq!(sets.len(), 1);
+    assert_eq!(sets[0].w, Some(405.0));
+    assert_eq!(sets[0].r, Some(1));
+    assert_eq!(sets[0].s, Some(1));
+    assert_eq!(sets[0].c, None);
+
+    // 405 cccc          - ( Set { w=405, r=1, s=1, c="cccc" } )
+    let sets = parse_set_line("405 cccc").unwrap();
+    assert_eq!(sets.len(), 1);
+    assert_eq!(sets[0].w, Some(405.0));
+    assert_eq!(sets[0].r, Some(1));
+    assert_eq!(sets[0].s, Some(1));
+    assert_eq!(sets[0].c, Some("cccc".to_string()));
+
+    // 405 x 2           - ( Set { w=405, r=2, s=1, c="" } )
+    let sets = parse_set_line("405 x 2").unwrap();
+    assert_eq!(sets.len(), 1);
+    assert_eq!(sets[0].w, Some(405.0));
+    assert_eq!(sets[0].r, Some(2));
+    assert_eq!(sets[0].s, Some(1));
+    assert_eq!(sets[0].c, None);
+
+    // 405 x 2 x 3       - ( Set { w=405, r=2, s=3, c="" } )
+    let sets = parse_set_line("405 x 2 x 3").unwrap();
+    assert_eq!(sets.len(), 1);
+    assert_eq!(sets[0].w, Some(405.0));
+    assert_eq!(sets[0].r, Some(2));
+    assert_eq!(sets[0].s, Some(3));
+    assert_eq!(sets[0].c, None);
+
+    // 405 x 2, 3        - ( Set { w=405, r=2, s=1, c="" }, Set { w=405, r=3, s=1, c="" } )
+    let sets = parse_set_line("405 x 2, 3").unwrap();
+    assert_eq!(sets.len(), 2);
+    assert_eq!(sets[0].w, Some(405.0));
+    assert_eq!(sets[0].r, Some(2));
+    assert_eq!(sets[0].s, Some(1));
+    assert_eq!(sets[0].c, None);
+    assert_eq!(sets[1].w, Some(405.0));
+    assert_eq!(sets[1].r, Some(3));
+    assert_eq!(sets[1].s, Some(1));
+    assert_eq!(sets[1].c, None);
+
+    // 405 x 2, 3 cccc   - ( Set { w=405, r=2, s=1, c="" }, Set { w=405, r=3, s=1, c="cccc" } )
+    let sets = parse_set_line("405 x 2, 3 cccc").unwrap();
+    assert_eq!(sets.len(), 2);
+    assert_eq!(sets[0].w, Some(405.0));
+    assert_eq!(sets[0].r, Some(2));
+    assert_eq!(sets[0].s, Some(1));
+    assert_eq!(sets[0].c, None);
+    assert_eq!(sets[1].w, Some(405.0));
+    assert_eq!(sets[1].r, Some(3));
+    assert_eq!(sets[1].s, Some(1));
+    assert_eq!(sets[1].c, Some("cccc".to_string()));
+
+    // 405, 406 x 2      - ( Set { w=405, r=2, s=1, c="" }, Set { w=406, r=2, s=1, c="" } )
+    let sets = parse_set_line("405, 406 x 2").unwrap();
+    assert_eq!(sets.len(), 2);
+    assert_eq!(sets[0].w, Some(405.0));
+    assert_eq!(sets[0].r, Some(2));
+    assert_eq!(sets[0].s, Some(1));
+    assert_eq!(sets[0].c, None);
+    assert_eq!(sets[1].w, Some(406.0));
+    assert_eq!(sets[1].r, Some(2));
+    assert_eq!(sets[1].s, Some(1));
+    assert_eq!(sets[1].c, None);
+
+    // 405, 406 x 2 cccc - ( Set { w=405, r=2, s=1, c="" }, Set { w=406, r=2, s=1, c="cccc" } )
+    let sets = parse_set_line("405, 406 x 2 cccc").unwrap();
+    assert_eq!(sets.len(), 2);
+    assert_eq!(sets[0].w, Some(405.0));
+    assert_eq!(sets[0].r, Some(2));
+    assert_eq!(sets[0].s, Some(1));
+    assert_eq!(sets[0].c, None);
+    assert_eq!(sets[1].w, Some(406.0));
+    assert_eq!(sets[1].r, Some(2));
+    assert_eq!(sets[1].s, Some(1));
+    assert_eq!(sets[1].c, Some("cccc".to_string()));
+}
+
+#[test]
 fn test_parse_2025_10_31() {
     let cache_text = r#"2025-10-31
 @ 100.6980 bw
