@@ -110,6 +110,10 @@ pub fn parse_workout(text: &str) -> Result<JDay, String> {
 //   405, 406 x 2      - ( Set { w=405, r=2, s=1, c="" }, Set { w=406, r=2, s=1, c="" } )
 //   405, 406 x 2 cccc - ( Set { w=405, r=2, s=1, c="" }, Set { w=406, r=2, s=1, c="cccc" } )
 
+pub fn is_weight_part(s: &str) -> bool {
+    s.chars().all(|c| c.is_digit(10) || c == ',' || c == '.')
+}
+
 pub fn parse_weights(s: &str) -> Result<Vec<f32>, String> {
     s.split(',')
         .map(|p| p.trim().parse::<f32>().map_err(|_| format!("Invalid weight: {}", p)))
@@ -117,32 +121,27 @@ pub fn parse_weights(s: &str) -> Result<Vec<f32>, String> {
 }
 
 pub fn parse_reps_and_comment(s: &str) -> Result<(Vec<u32>, Option<String>), String> {
-    let s = s.trim();
-    if s.is_empty() {
-        return Ok((vec![1], None));
-    }
+    let parts: Vec<&str> = s.split(',').map(|p| p.trim()).collect();
     let mut reps = Vec::new();
-    let mut rest = s;
-    loop {
-        let comma_pos = rest.find(',');
-        let num_str = if let Some(pos) = comma_pos {
-            rest[..pos].trim()
-        } else {
-            rest.trim()
-        };
-        if num_str.is_empty() {
+    let mut comment = None;
+    for (i, part) in parts.iter().enumerate() {
+        let sub_parts: Vec<&str> = part.split_whitespace().collect();
+        if sub_parts.is_empty() {
             return Err("Empty rep".to_string());
         }
+        let num_str = sub_parts[0];
         let num: u32 = num_str.parse().map_err(|_| format!("Invalid rep: {}", num_str))?;
         reps.push(num);
-        if comma_pos.is_none() {
-            let after = &rest[num_str.len()..].trim();
-            let comment = if after.is_empty() { None } else { Some(after.to_string()) };
-            return Ok((reps, comment));
-        } else {
-            rest = &rest[comma_pos.unwrap() + 1..];
+        let rest = sub_parts[1..].join(" ");
+        if !rest.is_empty() {
+            if i == parts.len() - 1 {
+                comment = Some(rest);
+            } else {
+                return Err("Comment only allowed on last rep".to_string());
+            }
         }
     }
+    Ok((reps, comment))
 }
 
 pub fn parse_set_line(line: &str) -> Result<Vec<Set>, String> {
@@ -151,9 +150,9 @@ pub fn parse_set_line(line: &str) -> Result<Vec<Set>, String> {
     if parts.is_empty() {
         return Err("Empty line".to_string());
     }
-    // Collect weights parts until 'x' or end
+    // Collect weights parts until not weight part
     let mut weights_end = 0;
-    while weights_end < parts.len() && parts[weights_end] != "x" {
+    while weights_end < parts.len() && is_weight_part(parts[weights_end]) {
         weights_end += 1;
     }
     let weights_str = parts[0..weights_end].join(" ");
@@ -164,7 +163,7 @@ pub fn parse_set_line(line: &str) -> Result<Vec<Set>, String> {
     let mut comment = None;
     let mut sets = 1;
     let mut reps = vec![1];
-    if weights_end < parts.len() {
+    if weights_end < parts.len() && parts[weights_end] == "x" {
         // Has 'x'
         let reps_start = weights_end + 1;
         let mut sets_start = None;
