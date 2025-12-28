@@ -5,6 +5,7 @@ mod api;
 mod workouts;
 mod utils;
 mod parsers;
+mod fetch;
 
 use clap::{Parser, Subcommand};
 
@@ -35,6 +36,7 @@ struct Args {
 enum Commands {
     List(ListArgs),
     Show(ShowArgs),
+    Fetch(FetchArgs),
 }
 
 #[derive(Parser)]
@@ -66,6 +68,20 @@ struct ShowArgs {
     summary: bool,
 
     date: Option<String>,
+}
+
+#[derive(Parser)]
+struct FetchArgs {
+    #[arg(long)]
+    diff: bool,
+
+    #[arg(long)]
+    force: bool,
+
+    #[arg(long, value_name = "FILE")]
+    file: Option<String>,
+
+    dates: Vec<String>,
 }
 
 
@@ -275,6 +291,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if !workout.ends_with('\n') {
                     println!();
                 }
+            }
+        }
+        Commands::Fetch(fetch_args) => {
+            let client = ReqwestClient::new_with_verbose(args.verbose);
+            let token = match auth::login(&client, &credentials_path.as_str(), &token_path).await {
+                Ok(t) => t,
+                Err(e) => {
+                    eprintln!("{}", e);
+                    std::process::exit(1);
+                }
+            };
+
+            if let Err(e) = fetch::fetch_command(
+                &client,
+                &token,
+                &fetch_args.dates,
+                fetch_args.diff,
+                fetch_args.force,
+                fetch_args.file.as_deref(),
+                args.verbose,
+            ).await {
+                eprintln!("{}", e);
+                std::process::exit(1);
             }
         }
     }

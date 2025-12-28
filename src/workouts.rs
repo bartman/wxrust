@@ -26,7 +26,7 @@ fn get_cache_file_path(uid: u32, date: &str) -> Result<PathBuf, String> {
     Ok(cache_dir.join(format!("{}.txt", date)))
 }
 
-fn lookup_cached_jday(uid: u32, date: &str, verbose: bool) -> Option<models::JDay> {
+pub fn lookup_cached_jday(uid: u32, date: &str, verbose: bool) -> Option<models::JDay> {
     if let Ok(cache_path) = get_cache_file_path(uid, date) {
         if cache_path.exists() {
             if let Ok(content) = fs::read_to_string(&cache_path) {
@@ -46,7 +46,7 @@ fn lookup_cached_jday(uid: u32, date: &str, verbose: bool) -> Option<models::JDa
     None
 }
 
-fn write_cached_jday(uid: u32, date: &str, jday: &models::JDay) {
+pub fn write_cached_jday(uid: u32, date: &str, jday: &models::JDay) {
     if let Ok(cache_path) = get_cache_file_path(uid, date) {
         if let Some(parent) = cache_path.parent() {
             let _ = fs::create_dir_all(parent);
