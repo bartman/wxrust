@@ -26,12 +26,7 @@ fn get_cache_file_path(uid: u32, date: &str) -> Result<PathBuf, String> {
     Ok(cache_dir.join(format!("{}.txt", date)))
 }
 
-#[allow(unreachable_code)]
-pub async fn get_jday<C: crate::api::ApiClient>(client: &C, token: &str, date: &str, verbose: bool) -> Result<models::JDay, String> {
-    let claims = auth::decode_token(&token).map_err(|e| e.to_string())?;
-    let uid = claims.id;
-
-    // Check cache
+fn lookup_cached_jday(uid: u32, date: &str, verbose: bool) -> Option<models::JDay> {
     if let Ok(cache_path) = get_cache_file_path(uid, date) {
         if cache_path.exists() {
             if let Ok(content) = fs::read_to_string(&cache_path) {
@@ -39,14 +34,37 @@ pub async fn get_jday<C: crate::api::ApiClient>(client: &C, token: &str, date: &
                     if verbose {
                         eprintln!("\x1b[34mgetting {} from cache {}\x1b[0m", date, cache_path.display());
                     }
-                    return Ok(jday);
-                } else {
-                    if verbose {
-                        eprintln!("\x1b[34mfailed parsing {} from cache {}\x1b[0m", date, cache_path.display());
-                    }
+                    return Some(jday);
+                }
+
+                if verbose {
+                    eprintln!("\x1b[34mfailed parsing {} from cache {}\x1b[0m", date, cache_path.display());
                 }
             }
         }
+    }
+    None
+}
+
+fn write_cached_jday(uid: u32, date: &str, jday: &models::JDay) {
+    if let Ok(cache_path) = get_cache_file_path(uid, date) {
+        if let Some(parent) = cache_path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let plain = formatters::format_workout_for_cache(date, jday);
+        let plain = plain + "\n";
+        let _ = fs::write(&cache_path, plain);
+    }
+}
+
+#[allow(unreachable_code)]
+pub async fn get_jday<C: crate::api::ApiClient>(client: &C, token: &str, date: &str, verbose: bool) -> Result<models::JDay, String> {
+    let claims = auth::decode_token(&token).map_err(|e| e.to_string())?;
+    let uid = claims.id;
+
+    // Check cache
+    if let Some(jday) = lookup_cached_jday(uid, date, verbose) {
+        return Ok(jday);
     }
 
     let query = format!(r#"
@@ -75,14 +93,7 @@ query {{
     if let Some(data) = response.data {
         if let Some(jday) = data.jday {
             // Cache the plain version, using kg
-            if let Ok(cache_path) = get_cache_file_path(uid, date) {
-                if let Some(parent) = cache_path.parent() {
-                    let _ = fs::create_dir_all(parent);
-                }
-                let plain = formatters::format_workout_for_cache(date, &jday);
-                let plain = plain + "\n";
-                let _ = fs::write(&cache_path, plain);
-            }
+            write_cached_jday(uid, date, &jday);
             // return the jday
             Ok(jday)
         } else {
