@@ -105,7 +105,7 @@ async fn test_get_jday_success() {
         });
     mock_client
         .expect_user_wants_kg()
-        .times(1)
+        .times(0)
         .returning(|_| true);
 
     let result = get_jday(&mock_client, &token, "2023-10-01", false).await;
