@@ -2,7 +2,7 @@
 
 [![codecov](https://codecov.io/gh/bartman/wxrust/branch/master/graph/badge.svg)](https://app.codecov.io/github/bartman/wxrust)
 
-A Rust CLI tool to extract and display workouts from the WeightXReps.net website. It authenticates using credentials from a file and retrieves workout data via the GraphQL API, with support for listing, showing, and summarizing workouts.
+A Rust CLI tool to extract and display workouts from the WeightXReps.net website. It authenticates using credentials from a file and retrieves workout data via the GraphQL API, with support for listing, showing, summarizing, and fetching workouts into local cache.
 
 ## Features
 
@@ -12,6 +12,9 @@ A Rust CLI tool to extract and display workouts from the WeightXReps.net website
 - Supports detailed views, summaries, and date filtering
 - Handles JWT tokens and GraphQL queries efficiently
 - Caches workout data locally in XDG cache directory for improved performance
+- Fetches and caches workouts in bulk with progress indication
+- Compares local cache with server versions
+- Imports workouts from text export files
 
 ## Installation
 
@@ -67,6 +70,14 @@ Create a `credentials.txt` file with your WeightXReps account email on the first
 - Reverse order: `wxrust list --count 5 --reverse`
 - List all (up to 1000): `wxrust list --all`
 
+#### Fetch Workouts
+
+- Fetch and cache workouts for 2025: `wxrust fetch 2025`
+- Fetch all workouts: `wxrust fetch`
+- Show diff between local and server: `wxrust fetch --diff 2025-10`
+- Force re-download: `wxrust fetch --force 2025`
+- Import from text export file: `wxrust fetch --file export.txt`
+
 ### Examples
 
 ```bash
@@ -85,6 +96,12 @@ wxrust list --summary --before 2025-10-30 --count 3
 # List workouts in October 2025
 wxrust list 2025-10-01..2025-10-31
 
+# Fetch workouts for 2025
+wxrust fetch 2025
+
+# Show differences for October workouts
+wxrust fetch --diff 2025-10
+
 # Disable colors
 wxrust --color never list --summary --count 1
 ```
@@ -101,6 +118,8 @@ wxrust --color never list --summary --count 1
 - `clap`: CLI parsing
 - `regex`: Text processing
 - `chrono`: Date handling
+- `indicatif`: Progress bars
+- `similar`: Text diffing
 
 ## API Details
 

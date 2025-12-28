@@ -70,6 +70,9 @@ You can look in `weightxreps-client/src/data/generated---db-types-and-hooks.tsx`
 - Ensures ordered output in list commands by buffering concurrent async requests to maintain sequence.
 - Local caching of structured workout data in XDG_CACHE_HOME/wxrust/{uid}/yyyy-mm-dd.txt for offline access and performance.
 - Cache format is text, same as what is formatted for output using `format_workout_for_cache`
+- Bulk fetch command to download workouts from server into cache, with options for diff, force, and file import
+- Progress bars for long-running operations using indicatif
+- Side-by-side diff display using similar crate for comparing local and server workouts
 
 ## Dependencies Added
 
@@ -87,6 +90,8 @@ You can look in `weightxreps-client/src/data/generated---db-types-and-hooks.tsx`
 - `dirs` (5.0) for XDG directory handling.
 - `mockall` (0.12) for mocking in tests (dev-dependency).
 - `tempfile` (3.0) for temporary files in tests (dev-dependency).
+- `indicatif` (0.18) for progress bars.
+- `similar` (2.7) for text diffing.
 
 ## Testing and CI/CD
 
