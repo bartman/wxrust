@@ -77,3 +77,38 @@ fn test_round_trip() {
     // Should match
     assert_eq!(full_formatted_text, reformatted_full_text);
 }
+
+#[test]
+fn test_parse_cache_text() {
+    let cache_text = r#"2025-12-26
+@ 105 bw
+531 squat C26 W2
+TM: 495
+#safety-squat #sq #SQ
+165 x 10
+255 x 5
+305, 360, 415 x 3
+455 x 6
+// skip: 360 x 5 AMRAP
+// https://fivethreeone.app/calculator?program=NU-LTsMwEPyVas6ryI5jle6tRTwkWgriiHpISwpFwKEx6iHyv3dsJ5fdmd2ZHe2AFmoEe.i7vXHi3EKahRc-tzvBATrgA9oIOgoGXEjqKAXYCbgJmEjTEXpsf-pO8DmiKHhKl9Y5agNlAJ55wLFv8-Ah1xdoOP8n-VfSn1KxOd5TLbCG8Ww.q.sydIU1ibH7Qq0xRVSN1qouC1PNJ.DzaVM2DP0m9.y-KfcPivvTuQ.zty7M1m0fIHhMm7tsD-xb0EN9pGWZFitaKLotXwhex3fiFQ__"#;
+
+    // Parse the cache text
+    let parsed_jday = parse_workout(cache_text).unwrap();
+
+    // The parsed JDay should have the correct structure
+    assert_eq!(parsed_jday.bw, Some(105.0));
+    assert_eq!(parsed_jday.exercises.len(), 1);
+    assert_eq!(parsed_jday.exercises[0].exercise.name, "safety-squat #sq #SQ");
+    assert_eq!(parsed_jday.eblocks.len(), 1);
+    assert_eq!(parsed_jday.eblocks[0].eid, "safety-squat #sq #SQ");
+    assert_eq!(parsed_jday.eblocks[0].sets.len(), 5); // 165x10, 255x5, 305x3, 360x3, 415x3, 455x6
+
+    // Check the log
+    let expected_log = "531 squat C26 W2\nTM: 495\nEBLOCK:safety-squat #sq #SQ\n// skip: 360 x 5 AMRAP\n// https://fivethreeone.app/calculator?program=NU-LTsMwEPyVas6ryI5jle6tRTwkWgriiHpISwpFwKEx6iHyv3dsJ5fdmd2ZHe2AFmoEe.i7vXHi3EKahRc-tzvBATrgA9oIOgoGXEjqKAXYCbgJmEjTEXpsf-pO8DmiKHhKl9Y5agNlAJ55wLFv8-Ah1xdoOP8n-VfSn1KxOd5TLbCG8Ww.q.sydIU1ibH7Qq0xRVSN1qouC1PNJ.DzaVM2DP0m9.y-KfcPivvTuQ.zty7M1m0fIHhMm7tsD-xb0EN9pGWZFitaKLotXwhex3fiFQ__";
+    assert_eq!(parsed_jday.log, expected_log);
+
+    // Format back and check it matches the input
+    unsafe { std::env::set_var("WXRUST_COLOR", "never"); }
+    let reformatted = format_workout_no_color("2025-12-26", &parsed_jday, true);
+    assert_eq!(reformatted, cache_text);
+}

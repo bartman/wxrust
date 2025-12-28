@@ -26,75 +26,60 @@ pub fn parse_workout(text: &str) -> Result<JDay, String> {
     let bw_val: f32 = bw_str[..bw_str.len()-3].trim().parse().map_err(|_| "Invalid bw number")?;
     i += 1;
 
-    // Collect program notes until first #exercise
-    let mut program_notes = Vec::new();
-    while i < lines.len() && !lines[i].starts_with('#') {
-        if !lines[i].trim().is_empty() {
-            program_notes.push(lines[i].trim());
-        }
-        i += 1;
-    }
-
-    // Now parse exercises
+    // Now parse the rest, building log and extracting exercises
     let mut exercises = Vec::new();
     let mut eblocks = Vec::new();
+    let mut log_lines = Vec::new();
 
     while i < lines.len() {
-        let line = lines[i].trim();
-        if line.is_empty() {
+        let line = lines[i];
+        if line.trim().is_empty() {
+            log_lines.push(line.to_string());
             i += 1;
             continue;
         }
         if line.starts_with("//") {
-            // URL/comment, add to program notes
-            program_notes.push(line);
+            log_lines.push(line.to_string());
             i += 1;
             continue;
         }
-        if !line.starts_with('#') {
-            return Err(format!("Expected exercise line starting with #, got: {}", line));
-        }
+        if line.starts_with('#') {
+            // Parse exercise name
+            let name = line[1..].trim().to_string();
+            let eid = name.clone();
 
-        // Parse exercise name
-        let exercise_line = &line[1..]; // remove #
-        let parts: Vec<&str> = exercise_line.split('#').map(|s| s.trim()).collect();
-        let name = parts[0].to_string();
-        let ex_type = if parts.len() > 1 { Some(parts[1].to_string()) } else { None };
+            exercises.push(ExerciseWrapper {
+                exercise: Exercise {
+                    id: eid.clone(),
+                    name: name.clone(),
+                    ex_type: None,
+                }
+            });
 
-        let eid = name.clone();
+            log_lines.push(format!("EBLOCK:{}", eid));
 
-        exercises.push(ExerciseWrapper {
-            exercise: Exercise {
-                id: eid.clone(),
-                name: name.clone(),
-                ex_type,
+            // Parse sets
+            i += 1;
+            let mut sets = Vec::new();
+            while i < lines.len() && !lines[i].starts_with('#') && !lines[i].starts_with("//") && !lines[i].trim().is_empty() {
+                let set_line = lines[i].trim();
+                let set = parse_set_line(set_line)?;
+                sets.extend(set);
+                i += 1;
             }
-        });
 
-        // Parse sets
-        i += 1;
-        let mut sets = Vec::new();
-        while i < lines.len() && !lines[i].starts_with('#') && !lines[i].starts_with("//") && !lines[i].trim().is_empty() {
-            let set_line = lines[i].trim();
-            let set = parse_set_line(set_line)?;
-            sets.extend(set);
+            eblocks.push(EBlock {
+                eid,
+                sets,
+            });
+        } else {
+            log_lines.push(line.to_string());
             i += 1;
         }
-
-        eblocks.push(EBlock {
-            eid,
-            sets,
-        });
     }
 
     // Build log
-    let mut log = program_notes.join("\n");
-    if !log.is_empty() && !eblocks.is_empty() {
-        log += "\n";
-    }
-    for eblock in eblocks.iter() {
-        log += &format!("EBLOCK:{}\n", eblock.eid);
-    }
+    let log = log_lines.join("\n");
 
     Ok(JDay {
         log,
