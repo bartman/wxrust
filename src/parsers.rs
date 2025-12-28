@@ -7,23 +7,23 @@ pub fn parse_workout(text: &str) -> Result<JDay, String> {
 
     // Skip date line
     if i >= lines.len() {
-        return Err("No date line".to_string());
+        return Err("Line 1: No date line".to_string());
     }
     i += 1;
 
     // Parse bw line
     if i >= lines.len() {
-        return Err("No bw line".to_string());
+        return Err(format!("Line {}: No bw line", i + 1));
     }
     let bw_line = lines[i];
     if !bw_line.starts_with("@ ") {
-        return Err("Expected @ bw line".to_string());
+        return Err(format!("Line {}: Expected @ bw line, got '{}'", i + 1, bw_line));
     }
     let bw_str = &bw_line[2..].trim();
     if !bw_str.ends_with(" bw") {
-        return Err("Expected 'bw' at end".to_string());
+        return Err(format!("Line {}: Expected 'bw' at end of bw line, got '{}'", i + 1, bw_str));
     }
-    let bw_val: f32 = bw_str[..bw_str.len()-3].trim().parse().map_err(|_| "Invalid bw number")?;
+    let bw_val: f32 = bw_str[..bw_str.len()-3].trim().parse().map_err(|e| format!("Line {}: Invalid bw number '{}': {}", i + 1, bw_str[..bw_str.len()-3].trim(), e))?;
     i += 1;
 
     // Now parse the rest, building log and extracting exercises
@@ -68,7 +68,7 @@ pub fn parse_workout(text: &str) -> Result<JDay, String> {
                     Ok(set) => {
                         sets.extend(set);
                     }
-                    Err(_) => {
+                    Err(_e) => {
                         // Not a set line, add to log
                         log_lines.push(line.to_string());
                     }
