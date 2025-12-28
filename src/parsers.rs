@@ -121,26 +121,53 @@ pub fn parse_weights(s: &str) -> Result<Vec<f32>, String> {
 }
 
 pub fn parse_reps_and_comment(s: &str) -> Result<(Vec<u32>, Option<String>), String> {
-    let parts: Vec<&str> = s.split(',').map(|p| p.trim()).collect();
+    let s = s.trim();
     let mut reps = Vec::new();
-    let mut comment = None;
-    for (i, part) in parts.iter().enumerate() {
-        let sub_parts: Vec<&str> = part.split_whitespace().collect();
-        if sub_parts.is_empty() {
-            return Err("Empty rep".to_string());
+    let mut i = 0;
+    let chars: Vec<char> = s.chars().collect();
+    while i < chars.len() {
+        // Skip whitespace
+        while i < chars.len() && chars[i].is_whitespace() {
+            i += 1;
         }
-        let num_str = sub_parts[0];
+        if i >= chars.len() {
+            break;
+        }
+        // Parse number
+        let start = i;
+        while i < chars.len() && chars[i].is_digit(10) {
+            i += 1;
+        }
+        if start == i {
+            // No number, the rest is comment
+            break;
+        }
+        let num_str: String = chars[start..i].iter().collect();
         let num: u32 = num_str.parse().map_err(|_| format!("Invalid rep: {}", num_str))?;
         reps.push(num);
-        let rest = sub_parts[1..].join(" ");
-        if !rest.is_empty() {
-            if i == parts.len() - 1 {
-                comment = Some(rest);
-            } else {
-                return Err("Comment only allowed on last rep".to_string());
-            }
+        // Skip whitespace
+        while i < chars.len() && chars[i].is_whitespace() {
+            i += 1;
+        }
+        // Check for ,
+        if i < chars.len() && chars[i] == ',' {
+            i += 1;
+            // Continue to next number
+        } else {
+            // No more , , the rest is comment
+            break;
         }
     }
+    // The rest from i is comment
+    let mut comment_start = i;
+    while comment_start < chars.len() && chars[comment_start].is_whitespace() {
+        comment_start += 1;
+    }
+    let comment = if comment_start < chars.len() {
+        Some(chars[comment_start..].iter().collect())
+    } else {
+        None
+    };
     Ok((reps, comment))
 }
 

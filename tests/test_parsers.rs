@@ -318,14 +318,6 @@ TM: 465
     assert_eq!(parsed_jday.exercises[0].exercise.name, "safety-box-squat #sq");
     assert_eq!(parsed_jday.eblocks.len(), 1);
     assert_eq!(parsed_jday.eblocks[0].eid, "safety-box-squat #sq");
-    eprintln!("sets.len() = {}", parsed_jday.eblocks[0].sets.len());
-    for item in &parsed_jday.eblocks[0].sets {
-        eprintln!("- {} x {} x {}",
-            item.w.unwrap_or(0.0),
-            item.r.unwrap_or(0),
-            item.s.unwrap_or(0)
-        );
-    }
     assert_eq!(parsed_jday.eblocks[0].sets.len(), 8); // 135x10, 235x5, 285x3, 350x5, 405x3, 445x1, 445x3, 350x5
 
     // Check the compressed reps sets
