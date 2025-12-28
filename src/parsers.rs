@@ -100,6 +100,16 @@ pub fn parse_workout(text: &str) -> Result<JDay, String> {
     })
 }
 
+// examples:
+//   405               - ( Set { w=405, r=1, s=1, c="" } )
+//   405 cccc          - ( Set { w=405, r=1, s=1, c="cccc" } )
+//   405 x 2           - ( Set { w=405, r=2, s=1, c="" } )
+//   405 x 2 x 3       - ( Set { w=405, r=2, s=3, c="" } )
+//   405 x 2, 3        - ( Set { w=405, r=2, s=1, c="" }, Set { w=405, r=3, s=1, c="" } )
+//   405 x 2, 3 cccc   - ( Set { w=405, r=2, s=1, c="" }, Set { w=405, r=3, s=1, c="cccc" } )
+//   405, 406 x 2      - ( Set { w=405, r=2, s=1, c="" }, Set { w=406, r=2, s=1, c="" } )
+//   405, 406 x 2 cccc - ( Set { w=405, r=2, s=1, c="" }, Set { w=406, r=2, s=1, c="cccc" } )
+
 fn parse_set_line(line: &str) -> Result<Vec<Set>, String> {
     let set_parts = line.trim();
 
