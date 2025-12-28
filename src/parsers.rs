@@ -62,9 +62,17 @@ pub fn parse_workout(text: &str) -> Result<JDay, String> {
             i += 1;
             let mut sets = Vec::new();
             while i < lines.len() && !lines[i].starts_with('#') && !lines[i].starts_with("//") && !lines[i].trim().is_empty() {
-                let set_line = lines[i].trim();
-                let set = parse_set_line(set_line)?;
-                sets.extend(set);
+                let line = lines[i];
+                let set_line = line.trim();
+                match parse_set_line(set_line) {
+                    Ok(set) => {
+                        sets.extend(set);
+                    }
+                    Err(_) => {
+                        // Not a set line, add to log
+                        log_lines.push(line.to_string());
+                    }
+                }
                 i += 1;
             }
 
