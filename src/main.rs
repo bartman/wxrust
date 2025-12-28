@@ -207,11 +207,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             Some(jday) => jday,
                             _ => continue
                         };
-                        let fmt_date = formatters::color_date(&date);
                         if list.details {
                             let workout = formatters::format_workout(&date, &jday, user_wants_kg);
-                            println!("{}\n{}", fmt_date, workout);
+                            println!("{}", workout);
                         } else if list.summary {
+                            let fmt_date = formatters::color_date(&date);
                             let summary = formatters::summarize_workout(&jday);
                             println!("{} {}", fmt_date, summary);
                         }
@@ -260,15 +260,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     std::process::exit(1);
                 }
             };
-            let fmt_date = formatters::color_date(&date);
 
             if show.summary {
+                let fmt_date = formatters::color_date(&date);
                 let summary = formatters::summarize_workout(&jday);
                 println!("{} {}", fmt_date, summary);
             } else {
                 let user_wants_kg = client.user_wants_kg(&token).await;
                 let workout = formatters::format_workout(&date, &jday, user_wants_kg);
-                println!("{}\n{}", fmt_date, workout);
+                println!("{}", workout);
             }
         }
     }

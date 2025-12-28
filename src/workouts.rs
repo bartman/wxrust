@@ -35,15 +35,14 @@ pub async fn get_jday<C: crate::api::ApiClient>(client: &C, token: &str, date: &
     if let Ok(cache_path) = get_cache_file_path(uid, date) {
         if cache_path.exists() {
             if let Ok(content) = fs::read_to_string(&cache_path) {
-                match parsers::parse_workout(&content) {
-                    Ok(jday) => {
-                        println!("\x1b[34mgetting {} from cache {}\x1b[0m", date, cache_path.display());
-                        return Ok(jday);
-                    },
-                    Err(_err) => {
-                        if verbose {
-                            println!("\x1b[34mfailed parsing {} from cache {}\x1b[0m", date, cache_path.display());
-                        }
+                if let Ok(jday) = parsers::parse_workout(&content) {
+                    if verbose {
+                        eprintln!("\x1b[34mgetting {} from cache {}\x1b[0m", date, cache_path.display());
+                    }
+                    return Ok(jday);
+                } else {
+                    if verbose {
+                        eprintln!("\x1b[34mfailed parsing {} from cache {}\x1b[0m", date, cache_path.display());
                     }
                 }
             }
@@ -75,13 +74,13 @@ query {{
 
     if let Some(data) = response.data {
         if let Some(jday) = data.jday {
-            // Cache the plain version
-            let user_wants_kg = client.user_wants_kg(token).await;
+            // Cache the plain version, using kg
             if let Ok(cache_path) = get_cache_file_path(uid, date) {
                 if let Some(parent) = cache_path.parent() {
                     let _ = fs::create_dir_all(parent);
                 }
-                let plain = formatters::format_workout_no_color(date, &jday, user_wants_kg);
+                let plain = formatters::format_workout_no_color(date, &jday, true);
+                let plain = plain + "\n";
                 let _ = fs::write(&cache_path, plain);
             }
             // return the jday
@@ -117,7 +116,9 @@ query GetJRange($uid: ID!, $ymd: YMD!, $range: Int!) {
     let mut current_ymd = initial_ymd.clone();
 
     loop {
-        let batch_size = 32;
+        let want = (count as usize) - all_dates.len();
+        let batch_size = std::cmp::min(32, want);
+
         let variables = serde_json::json!({ "uid": uid.to_string(), "ymd": current_ymd.clone(), "range": batch_size });
 
         let response: models::GraphQLResponse<models::GetJRangeData> = api::graphql_request(client, token, query, Some(variables)).await.map_err(|e| e.to_string())?;

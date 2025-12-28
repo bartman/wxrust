@@ -153,7 +153,7 @@ impl ApiClient for ReqwestClient {
     async fn user_wants_kg(&self, token: &str) -> bool {
         let user = self.get_user_info(token).await;
         match user {
-            Ok(ref u) => return u.usekg.unwrap_or(1) != 1,
+            Ok(ref u) => return u.usekg.unwrap_or(1) == 1,
             Err(_) => return false
         }
     }
