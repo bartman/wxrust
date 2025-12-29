@@ -1,4 +1,10 @@
 use crate::models::{JDay, EBlock, ExerciseWrapper, Exercise, Set};
+use regex::Regex;
+use lazy_static::lazy_static;
+
+lazy_static! {
+    static ref BW_REGEX: Regex = Regex::new(r"^@ *([1-9][0-9]*\.?[0-9]*) *bw$").unwrap();
+}
 
 #[allow(dead_code)]
 pub fn parse_workout(text: &str) -> Result<JDay, String> {
@@ -11,20 +17,21 @@ pub fn parse_workout(text: &str) -> Result<JDay, String> {
     }
     i += 1;
 
-    // Parse bw line
-    if i >= lines.len() {
-        return Err(format!("Line {}: No bw line", i + 1));
+    // Parse bw line (optional)
+    let mut bw = None;
+    while i < lines.len() && lines[i].trim().is_empty() {
+        i += 1;
     }
-    let bw_line = lines[i];
-    if !bw_line.starts_with("@ ") {
-        return Err(format!("Line {}: Expected @ bw line, got '{}'", i + 1, bw_line));
+    if i < lines.len() {
+        let line = lines[i];
+        if let Some(caps) = BW_REGEX.captures(line.trim()) {
+            if let Some(num_match) = caps.get(1) {
+                let bw_val: f32 = num_match.as_str().parse().map_err(|_| format!("Line {}: Invalid bw number: {}", i + 1, num_match.as_str()))?;
+                bw = Some(bw_val);
+                i += 1;
+            }
+        }
     }
-    let bw_str = &bw_line[2..].trim();
-    if !bw_str.ends_with(" bw") {
-        return Err(format!("Line {}: Expected 'bw' at end of bw line, got '{}'", i + 1, bw_str));
-    }
-    let bw_val: f32 = bw_str[..bw_str.len()-3].trim().parse().map_err(|e| format!("Line {}: Invalid bw number '{}': {}", i + 1, bw_str[..bw_str.len()-3].trim(), e))?;
-    i += 1;
 
     // Now parse the rest, building log and extracting exercises
     let mut exercises = Vec::new();
@@ -94,7 +101,7 @@ pub fn parse_workout(text: &str) -> Result<JDay, String> {
 
     Ok(JDay {
         log,
-        bw: Some(bw_val),
+        bw,
         eblocks,
         exercises,
     })

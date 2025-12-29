@@ -296,13 +296,19 @@ fn format_workout_internal(date: &str, jday: &JDay, user_wants_kg: bool, bw_prec
         let placeholder = format!("EBLOCK:{}", eblock.eid);
         result = result.replace(&placeholder, &formatted);
     }
-    let bw = jday.bw.unwrap_or(0.0);
-    let bwtxt = if user_wants_kg {
-        &format!("{:.*}", bw_precision, bw)
-    } else {
-        &format!("{:.*}", bw_precision, bw * 2.20462) // convert kg to lb
-    };
-    format!("{}\n@ {} bw\n{}", color_date_internal(date, color_enabled), color_bw_internal(bwtxt, color_enabled), result)
+    let mut output = vec![color_date_internal(date, color_enabled)];
+    if let Some(bw) = jday.bw {
+        if bw > 0.0 {
+            let bwtxt = if user_wants_kg {
+                &format!("{:.*}", bw_precision, bw)
+            } else {
+                &format!("{:.*}", bw_precision, bw * 2.20462) // convert kg to lb
+            };
+            output.push(format!("@ {} bw", color_bw_internal(bwtxt, color_enabled)));
+        }
+    }
+    output.push(result);
+    output.join("\n")
 }
 
 #[allow(dead_code)]

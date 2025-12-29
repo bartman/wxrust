@@ -74,6 +74,7 @@ You can look in `weightxreps-client/src/data/generated---db-types-and-hooks.tsx`
 - Progress bars for long-running operations using indicatif
 - Side-by-side diff display using similar crate for comparing local and server workouts
 - Parsing and formatting support for RPE (@ syntax), BW exercises (BW, BW+, BW-), lb/kg units
+- Optional body weight line in workout parsing; workouts without "@ <number> bw" are allowed and set bw to None
 
 ## Dependencies Added
 
