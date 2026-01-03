@@ -6,6 +6,39 @@ use atty;
 //use crate::models::{JDay, Set, Exercise, EBlock, User};
 use crate::models::{JDay, Set, Exercise, EBlock};
 
+#[derive(Clone)]
+pub struct FormatOptions {
+    pub user_wants_kg: bool,
+    pub bw_precision: usize,
+    pub color_enabled: bool,
+}
+
+impl FormatOptions {
+    pub fn for_display(user_wants_kg: bool) -> Self {
+        Self {
+            user_wants_kg,
+            bw_precision: 0,
+            color_enabled: *COLOR_ENABLED,
+        }
+    }
+
+    pub fn for_cache() -> Self {
+        Self {
+            user_wants_kg: true,
+            bw_precision: 4,
+            color_enabled: false,
+        }
+    }
+
+    pub fn no_color(user_wants_kg: bool) -> Self {
+        Self {
+            user_wants_kg,
+            bw_precision: 0,
+            color_enabled: false,
+        }
+    }
+}
+
 lazy_static! {
     static ref COLOR_ENABLED: bool = {
         let color_arg = std::env::var("WXRUST_COLOR").unwrap_or("auto".to_string());
@@ -29,11 +62,11 @@ lazy_static! {
 }
 
 pub fn color_date(s: &str) -> String {
-    color_date_internal(s, *COLOR_ENABLED)
+    color_date_internal(s, &FormatOptions::for_display(true))
 }
 
-fn color_date_internal(s: &str, color_enabled: bool) -> String {
-    if color_enabled {
+fn color_date_internal(s: &str, options: &FormatOptions) -> String {
+    if options.color_enabled {
         Colour::RGB(157, 78, 221).paint(s).to_string()
     } else {
         s.to_string()
@@ -42,43 +75,43 @@ fn color_date_internal(s: &str, color_enabled: bool) -> String {
 
 #[allow(dead_code)]
 pub fn color_bw(s: &str) -> String {
-    color_bw_internal(s, *COLOR_ENABLED)
+    color_bw_internal(s, &FormatOptions::for_display(true))
 }
 
-fn color_bw_internal(s: &str, color_enabled: bool) -> String {
-    if color_enabled {
+fn color_bw_internal(s: &str, options: &FormatOptions) -> String {
+    if options.color_enabled {
         Colour::RGB(58, 134, 255).paint(s).to_string()
     } else {
         s.to_string()
     }
 }
 
-fn color_exercise_internal(s: &str, color_enabled: bool) -> String {
-    if color_enabled {
+fn color_exercise_internal(s: &str, options: &FormatOptions) -> String {
+    if options.color_enabled {
         Colour::RGB(0, 150, 255).paint(s).to_string()
     } else {
         s.to_string()
     }
 }
 
-fn color_weight_internal(s: &str, color_enabled: bool) -> String {
-    if color_enabled {
+fn color_weight_internal(s: &str, options: &FormatOptions) -> String {
+    if options.color_enabled {
         Colour::RGB(255, 121, 0).paint(s).to_string()
     } else {
         s.to_string()
     }
 }
 
-fn color_reps_internal(s: &str, color_enabled: bool) -> String {
-    if color_enabled {
+fn color_reps_internal(s: &str, options: &FormatOptions) -> String {
+    if options.color_enabled {
         Colour::RGB(0, 187, 249).paint(s).to_string()
     } else {
         s.to_string()
     }
 }
 
-fn color_sets_internal(s: &str, color_enabled: bool) -> String {
-    if color_enabled {
+fn color_sets_internal(s: &str, options: &FormatOptions) -> String {
+    if options.color_enabled {
         Colour::RGB(241, 91, 181).paint(s).to_string()
     } else {
         s.to_string()
@@ -113,11 +146,11 @@ pub fn format_weight_with_bw(w: f32, lb: bool, usebw: i32) -> String {
 
 #[allow(dead_code)]
 pub fn format_set(set: &Set) -> String {
-    format_set_internal(set, *COLOR_ENABLED)
+    format_set_internal(set, &FormatOptions::for_display(true))
 }
 
 #[allow(dead_code)]
-fn format_set_internal(set: &Set, color_enabled: bool) -> String {
+fn format_set_internal(set: &Set, options: &FormatOptions) -> String {
     let w = set.w.unwrap_or(0.0);
     let r = set.r.unwrap_or(0);
     let s = set.s.unwrap_or(1);
@@ -137,15 +170,15 @@ fn format_set_internal(set: &Set, color_enabled: bool) -> String {
     } else {
         format_weight(w, lb)
     };
-    let w_str = color_weight_internal(&line, color_enabled);
+    let w_str = color_weight_internal(&line, options);
     let mut line = w_str;
     if r > 0 {
         line += " x ";
-        line += &color_reps_internal(&r.to_string(), color_enabled);
+        line += &color_reps_internal(&r.to_string(), options);
     }
     if s > 1 {
         line += " x ";
-        line += &color_sets_internal(&s.to_string(), color_enabled);
+        line += &color_sets_internal(&s.to_string(), options);
     }
     if rpe > 0.0 {
         line += &format!(" @{}", rpe);
@@ -160,16 +193,16 @@ fn format_set_internal(set: &Set, color_enabled: bool) -> String {
 
 #[allow(dead_code)]
 pub fn compress_sets(sets: &[Set]) -> Vec<String> {
-    compress_sets_internal(sets, *COLOR_ENABLED)
+    compress_sets_internal(sets, &FormatOptions::for_display(true))
 }
 
-fn compress_sets_internal(sets: &[Set], color_enabled: bool) -> Vec<String> {
+fn compress_sets_internal(sets: &[Set], options: &FormatOptions) -> Vec<String> {
     let mut compressed = Vec::new();
     let mut i = 0;
     while i < sets.len() {
         let set = &sets[i];
         if set.set_type.unwrap_or(0) != 0 {
-            compressed.push(format_set_internal(set, color_enabled));
+            compressed.push(format_set_internal(set, options));
             i += 1;
             continue;
         }
@@ -192,8 +225,8 @@ fn compress_sets_internal(sets: &[Set], color_enabled: bool) -> Vec<String> {
         }
         if same_weight.len() > 1 {
             let line = format_weight_with_bw(w, lb, usebw);
-            let w_str = color_weight_internal(&line, color_enabled);
-            let r_str = same_weight.iter().map(|&r| color_reps_internal(&r.to_string(), color_enabled)).collect::<Vec<_>>().join(", ");
+            let w_str = color_weight_internal(&line, options);
+            let r_str = same_weight.iter().map(|&r| color_reps_internal(&r.to_string(), options)).collect::<Vec<_>>().join(", ");
             let mut line = format!("{} x {}", w_str, r_str);
             if rpe > 0.0 {
                 line += &format!(" @{}", rpe);
@@ -215,9 +248,9 @@ fn compress_sets_internal(sets: &[Set], color_enabled: bool) -> Vec<String> {
             if same_rep.len() > 1 {
                 let w_str = same_rep.iter().map(|&w| {
                     let line = format_weight_with_bw(w, lb, usebw);
-                    color_weight_internal(&line, color_enabled)
+                    color_weight_internal(&line, options)
                 }).collect::<Vec<_>>().join(", ");
-                let r_str = color_reps_internal(&r.to_string(), color_enabled);
+                let r_str = color_reps_internal(&r.to_string(), options);
                 let mut line = format!("{} x {}", w_str, r_str);
                 if rpe > 0.0 {
                     line += &format!(" @{}", rpe);
@@ -225,7 +258,7 @@ fn compress_sets_internal(sets: &[Set], color_enabled: bool) -> Vec<String> {
                 compressed.push(line);
                 i = j;
             } else {
-                compressed.push(format_set_internal(set, color_enabled));
+                compressed.push(format_set_internal(set, options));
                 i += 1;
             }
         }
@@ -235,27 +268,27 @@ fn compress_sets_internal(sets: &[Set], color_enabled: bool) -> Vec<String> {
 
 #[allow(dead_code)]
 pub fn format_single_eblock(jday: &JDay, eblock: &EBlock) -> String {
-    format_single_eblock_internal(jday, eblock, *COLOR_ENABLED)
+    format_single_eblock_internal(jday, eblock, &FormatOptions::for_display(true))
 }
 
-fn format_single_eblock_internal(jday: &JDay, eblock: &EBlock, color_enabled: bool) -> String {
+fn format_single_eblock_internal(jday: &JDay, eblock: &EBlock, options: &FormatOptions) -> String {
     let mut ex_map: HashMap<String, &Exercise> = HashMap::new();
     for ex_wrap in &jday.exercises {
         ex_map.insert(ex_wrap.exercise.id.clone(), &ex_wrap.exercise);
     }
     let mut lines = Vec::new();
     if let Some(ex) = ex_map.get(&eblock.eid) {
-        lines.push("#".to_string() + &color_exercise_internal(&ex.name, color_enabled));
-        lines.extend(compress_sets_internal(&eblock.sets, color_enabled));
+        lines.push("#".to_string() + &color_exercise_internal(&ex.name, options));
+        lines.extend(compress_sets_internal(&eblock.sets, options));
     }
     lines.join("\n")
 }
 
 pub fn summarize_workout(jday: &JDay) -> String {
-    summarize_workout_internal(jday, *COLOR_ENABLED)
+    summarize_workout_internal(jday, &FormatOptions::for_display(true))
 }
 
-fn summarize_workout_internal(jday: &JDay, color_enabled: bool) -> String {
+fn summarize_workout_internal(jday: &JDay, options: &FormatOptions) -> String {
     let mut ex_map: HashMap<String, &Exercise> = HashMap::new();
     for ex_wrap in &jday.exercises {
         ex_map.insert(ex_wrap.exercise.id.clone(), &ex_wrap.exercise);
@@ -276,9 +309,9 @@ fn summarize_workout_internal(jday: &JDay, color_enabled: bool) -> String {
             }
             if max_weight > 0.0 {
                 let lb = eblock.sets.iter().any(|s| s.lb.unwrap_or(0.0) == 1.0);
-                let w_str = color_weight_internal(&format_weight(max_weight, lb), color_enabled);
-                let r_str = color_reps_internal(&max_reps.to_string(), color_enabled);
-                summaries.push(format!("#{}  {}x{}", color_exercise_internal(&ex.name, color_enabled), w_str, r_str));
+                let w_str = color_weight_internal(&format_weight(max_weight, lb), options);
+                let r_str = color_reps_internal(&max_reps.to_string(), options);
+                summaries.push(format!("#{}  {}x{}", color_exercise_internal(&ex.name, options), w_str, r_str));
             }
         }
     }
@@ -286,25 +319,26 @@ fn summarize_workout_internal(jday: &JDay, color_enabled: bool) -> String {
 }
 
 pub fn format_workout(date: &str, jday: &JDay, user_wants_kg: bool) -> String {
-    format_workout_internal(date, jday, user_wants_kg, 0, *COLOR_ENABLED)
+    let options = FormatOptions::for_display(user_wants_kg);
+    format_workout_internal(date, jday, &options)
 }
 
-fn format_workout_internal(date: &str, jday: &JDay, user_wants_kg: bool, bw_precision: usize, color_enabled: bool) -> String {
+fn format_workout_internal(date: &str, jday: &JDay, options: &FormatOptions) -> String {
     let mut result = jday.log.clone();
     for eblock in &jday.eblocks {
-        let formatted = format_single_eblock_internal(jday, eblock, color_enabled);
+        let formatted = format_single_eblock_internal(jday, eblock, options);
         let placeholder = format!("EBLOCK:{}", eblock.eid);
         result = result.replace(&placeholder, &formatted);
     }
-    let mut output = vec![color_date_internal(date, color_enabled)];
+    let mut output = vec![color_date_internal(date, options)];
     if let Some(bw) = jday.bw {
         if bw > 0.0 {
-            let bwtxt = if user_wants_kg {
-                &format!("{:.*}", bw_precision, bw)
+            let bwtxt = if options.user_wants_kg {
+                &format!("{:.*}", options.bw_precision, bw)
             } else {
-                &format!("{:.*}", bw_precision, bw * 2.20462) // convert kg to lb
+                &format!("{:.*}", options.bw_precision, bw * 2.20462) // convert kg to lb
             };
-            output.push(format!("@ {} bw", color_bw_internal(bwtxt, color_enabled)));
+            output.push(format!("@ {} bw", color_bw_internal(bwtxt, options)));
         }
     }
     output.push(result);
@@ -313,9 +347,11 @@ fn format_workout_internal(date: &str, jday: &JDay, user_wants_kg: bool, bw_prec
 
 #[allow(dead_code)]
 pub fn format_workout_no_color(date: &str, jday: &JDay, user_wants_kg: bool) -> String {
-    format_workout_internal(date, jday, user_wants_kg, 0, false)
+    let options = FormatOptions::no_color(user_wants_kg);
+    format_workout_internal(date, jday, &options)
 }
 
 pub fn format_workout_for_cache(date: &str, jday: &JDay) -> String {
-    format_workout_internal(date, jday, true, 4, false)
+    let options = FormatOptions::for_cache();
+    format_workout_internal(date, jday, &options)
 }
