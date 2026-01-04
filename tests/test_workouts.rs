@@ -1,11 +1,14 @@
 use mockall::mock;
-use wxrust::workouts::{get_jday, get_dates, read_cached_user_wants_kg, read_cached_user_wants_kg_or, write_cached_user_wants_kg};
+use wxrust::workouts::{get_jday, get_dates, read_cached_user_wants_kg, read_cached_user_wants_kg_or, write_cached_user_wants_kg, forget_cached_user_wants_kg};
 use wxrust::models::{GraphQLResponse, WorkoutData, JDay, EBlock, ExerciseWrapper, Exercise, Set, User};
 use base64::{Engine, engine::general_purpose};
 use tempfile::TempDir;
 use lazy_static::lazy_static;
-use std::sync::Mutex;
+use tokio::sync::Mutex;
 
+// all tests in this file run sequentially to avoid clashing with global cached state;
+// to do this we use an async-aware mutex and hold it in each test,
+// essentially forcing single threaded execution
 lazy_static! {
     static ref ENV_MUTEX: Mutex<()> = Mutex::new(());
 }
@@ -25,7 +28,7 @@ mock! {
 
 #[tokio::test]
 async fn test_get_jday_graphql_error() {
-    let _guard = ENV_MUTEX.lock().unwrap();
+    let _guard = ENV_MUTEX.lock().await;
     // Set up test cache directory
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
@@ -60,7 +63,7 @@ async fn test_get_jday_graphql_error() {
 
 #[tokio::test]
 async fn test_get_jday_success() {
-    let _guard = ENV_MUTEX.lock().unwrap();
+    let _guard = ENV_MUTEX.lock().await;
     // Set up test cache directory
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
@@ -124,7 +127,7 @@ async fn test_get_jday_success() {
 
 #[tokio::test]
 async fn test_get_jday_no_workout() {
-    let _guard = ENV_MUTEX.lock().unwrap();
+    let _guard = ENV_MUTEX.lock().await;
     // Set up test cache directory
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
@@ -163,7 +166,7 @@ async fn test_get_jday_no_workout() {
 
 #[tokio::test]
 async fn test_get_jday_invalid_token() {
-    let _guard = ENV_MUTEX.lock().unwrap();
+    let _guard = ENV_MUTEX.lock().await;
     // Set up test cache directory
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
@@ -184,7 +187,7 @@ async fn test_get_jday_invalid_token() {
 
 #[tokio::test]
 async fn test_get_dates_success() {
-    let _guard = ENV_MUTEX.lock().unwrap();
+    let _guard = ENV_MUTEX.lock().await;
     // Set up test cache directory
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
@@ -226,7 +229,7 @@ async fn test_get_dates_success() {
 
 #[tokio::test]
 async fn test_get_dates_invalid_token() {
-    let _guard = ENV_MUTEX.lock().unwrap();
+    let _guard = ENV_MUTEX.lock().await;
     // Set up test cache directory
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
@@ -245,12 +248,14 @@ async fn test_get_dates_invalid_token() {
     }
 }
 
-#[test]
-fn test_read_cached_user_wants_kg_none() {
-    let _guard = ENV_MUTEX.lock().unwrap();
+#[tokio::test]
+async fn test_read_cached_user_wants_kg_none() {
+    let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
     unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+
+    forget_cached_user_wants_kg();
 
     // File doesn't exist
     assert_eq!(read_cached_user_wants_kg(), None);
@@ -263,12 +268,14 @@ fn test_read_cached_user_wants_kg_none() {
     }
 }
 
-#[test]
-fn test_read_cached_user_wants_kg_true() {
-    let _guard = ENV_MUTEX.lock().unwrap();
+#[tokio::test]
+async fn test_read_cached_user_wants_kg_true() {
+    let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
     unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+
+    forget_cached_user_wants_kg();
 
     // Create dir and file
     let wxrust_dir = temp_dir.path().join("wxrust");
@@ -285,12 +292,14 @@ fn test_read_cached_user_wants_kg_true() {
     }
 }
 
-#[test]
-fn test_read_cached_user_wants_kg_false() {
-    let _guard = ENV_MUTEX.lock().unwrap();
+#[tokio::test]
+async fn test_read_cached_user_wants_kg_false() {
+    let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
     unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+
+    forget_cached_user_wants_kg();
 
     // Create dir and file
     let wxrust_dir = temp_dir.path().join("wxrust");
@@ -307,12 +316,14 @@ fn test_read_cached_user_wants_kg_false() {
     }
 }
 
-#[test]
-fn test_read_cached_user_wants_kg_invalid() {
-    let _guard = ENV_MUTEX.lock().unwrap();
+#[tokio::test]
+async fn test_read_cached_user_wants_kg_invalid() {
+    let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
     unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+
+    forget_cached_user_wants_kg();
 
     // Create dir and file with invalid content
     let wxrust_dir = temp_dir.path().join("wxrust");
@@ -330,12 +341,14 @@ fn test_read_cached_user_wants_kg_invalid() {
     }
 }
 
-#[test]
-fn test_read_cached_user_wants_kg_or() {
-    let _guard = ENV_MUTEX.lock().unwrap();
+#[tokio::test]
+async fn test_read_cached_user_wants_kg_or() {
+    let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
     unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+
+    forget_cached_user_wants_kg();
 
     // No file, return default
     assert_eq!(read_cached_user_wants_kg_or(true), true);
@@ -356,12 +369,14 @@ fn test_read_cached_user_wants_kg_or() {
     }
 }
 
-#[test]
-fn test_write_cached_user_wants_kg() {
-    let _guard = ENV_MUTEX.lock().unwrap();
+#[tokio::test]
+async fn test_write_cached_user_wants_kg() {
+    let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
     unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+
+    forget_cached_user_wants_kg();
 
     write_cached_user_wants_kg(true);
     let file_path = temp_dir.path().join("wxrust").join("user_wants_kg");
