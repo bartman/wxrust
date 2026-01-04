@@ -4,8 +4,14 @@ use crate::formatters;
 use crate::models;
 use crate::parsers;
 use chrono::{Datelike, Utc};
+use lazy_static::lazy_static;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Mutex;
+
+lazy_static! {
+    static ref USER_WANTS_KG: Mutex<Option<bool>> = Mutex::new(None);
+}
 
 fn get_cache_base_dir() -> Result<PathBuf, String> {
     let cache_dir = if let Ok(dir) = std::env::var("XDG_CACHE_HOME") {
@@ -22,20 +28,27 @@ fn get_cache_base_dir() -> Result<PathBuf, String> {
 
 #[allow(dead_code)]
 pub fn read_cached_user_wants_kg() -> Option<bool> {
-    let cache_dir = get_cache_base_dir().ok()?;
-    let file_path = cache_dir.join("user_wants_kg");
-    if !file_path.exists() {
-        return None;
+    let mut guard = USER_WANTS_KG.lock().unwrap();
+    if guard.is_none() {
+        *guard = {
+            let cache_dir = get_cache_base_dir().ok()?;
+            let file_path = cache_dir.join("user_wants_kg");
+            if !file_path.exists() {
+                None
+            } else {
+                let content = fs::read_to_string(&file_path).ok()?;
+                match content.trim() {
+                    "0" => Some(false),
+                    "1" => Some(true),
+                    _ => {
+                        eprintln!("Warning: invalid content in user_wants_kg file");
+                        None
+                    }
+                }
+            }
+        };
     }
-    let content = fs::read_to_string(&file_path).ok()?;
-    match content.trim() {
-        "0" => Some(false),
-        "1" => Some(true),
-        _ => {
-            eprintln!("Warning: invalid content in user_wants_kg file");
-            None
-        }
-    }
+    *guard
 }
 
 #[allow(dead_code)]
@@ -56,6 +69,12 @@ pub fn write_cached_user_wants_kg(value: bool) {
             let _ = fs::rename(&temp_path, &file_path);
         }
     }
+    *USER_WANTS_KG.lock().unwrap() = Some(value);
+}
+
+#[allow(dead_code)]
+pub fn forget_cached_user_wants_kg() {
+    *USER_WANTS_KG.lock().unwrap() = None;
 }
 
 fn get_cache_dir(uid: u32) -> Result<PathBuf, String> {
