@@ -3,9 +3,10 @@ use wxrust::models::{JDay, Set, Exercise, ExerciseWrapper, EBlock};
 
 #[test]
 fn test_format_weight() {
-    assert_eq!(format_weight(100.0, false), "100");
-    assert_eq!(format_weight(100.0, true), "220");  // 100 * 2.20462 ≈ 220, rounded
-    assert_eq!(format_weight(45.5, false), "46");   // Rounded
+    let options = FormatOptions::no_color(true);
+    assert_eq!(format_weight(100.0, false, &options), "100");
+    assert_eq!(format_weight(100.0, true, &options), "45");  // 100 lbs to kg ≈ 45.35, rounded to 45
+    assert_eq!(format_weight(45.5, false, &options), "46");   // Rounded
 }
 
 #[test]

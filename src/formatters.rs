@@ -11,6 +11,7 @@ pub struct FormatOptions {
     pub user_wants_kg: bool,
     pub bw_precision: usize,
     pub color_enabled: bool,
+    pub show_unit_name: bool,
 }
 
 impl FormatOptions {
@@ -19,6 +20,7 @@ impl FormatOptions {
             user_wants_kg,
             bw_precision: 0,
             color_enabled: *COLOR_ENABLED,
+            show_unit_name: false,
         }
     }
 
@@ -27,6 +29,7 @@ impl FormatOptions {
             user_wants_kg: true,
             bw_precision: 4,
             color_enabled: false,
+            show_unit_name: true,
         }
     }
 
@@ -35,6 +38,7 @@ impl FormatOptions {
             user_wants_kg,
             bw_precision: 0,
             color_enabled: false,
+            show_unit_name: false,
         }
     }
 }
@@ -120,27 +124,38 @@ fn color_sets_internal(s: &str, options: &FormatOptions) -> String {
 
 
 
-pub fn format_weight(w: f32, lb: bool) -> String {
-    if lb {
-        format!("{:.0}", w * 2.20462)
+pub fn format_weight(w: f32, lb: bool, options: &FormatOptions) -> String {
+    let display_in_lbs = !options.user_wants_kg;
+    let num = if lb && display_in_lbs {
+        w
+    } else if lb && !display_in_lbs {
+        w / 2.20462
+    } else if !lb && display_in_lbs {
+        w * 2.20462
     } else {
-        format!("{:.0}", w)
+        w
+    };
+    let unit_str = if display_in_lbs { "lbs" } else { "kg" };
+    if options.show_unit_name {
+        format!("{:.0} {}", num, unit_str)
+    } else {
+        format!("{:.0}", num)
     }
 }
 
-pub fn format_weight_with_bw(w: f32, lb: bool, usebw: i32) -> String {
+pub fn format_weight_with_bw(w: f32, lb: bool, usebw: i32, options: &FormatOptions) -> String {
     if usebw != 0 {
         if w > 0.0 {
             if usebw > 0 {
-                format!("BW+{}", format_weight(w, lb))
+                format!("BW+{}", format_weight(w, lb, options))
             } else {
-                format!("BW-{}", format_weight(w, lb))
+                format!("BW-{}", format_weight(w, lb, options))
             }
         } else {
             "BW".to_string()
         }
     } else {
-        format_weight(w, lb)
+        format_weight(w, lb, options)
     }
 }
 
@@ -157,19 +172,7 @@ fn format_set_internal(set: &Set, options: &FormatOptions) -> String {
     let rpe = set.rpe.unwrap_or(0.0);
     let lb = set.lb.unwrap_or(0.0) == 1.0;
     let usebw = set.usebw.unwrap_or(0);
-    let line = if usebw != 0 {
-        if w > 0.0 {
-            if usebw > 0 {
-                format!("BW+{}", format_weight(w, lb))
-            } else {
-                format!("BW-{}", format_weight(w, lb))
-            }
-        } else {
-            "BW".to_string()
-        }
-    } else {
-        format_weight(w, lb)
-    };
+    let line = format_weight_with_bw(w, lb, usebw, options);
     let w_str = color_weight_internal(&line, options);
     let mut line = w_str;
     if r > 0 {
@@ -224,7 +227,7 @@ fn compress_sets_internal(sets: &[Set], options: &FormatOptions) -> Vec<String> 
             j += 1;
         }
         if same_weight.len() > 1 {
-            let line = format_weight_with_bw(w, lb, usebw);
+            let line = format_weight_with_bw(w, lb, usebw, options);
             let w_str = color_weight_internal(&line, options);
             let r_str = same_weight.iter().map(|&r| color_reps_internal(&r.to_string(), options)).collect::<Vec<_>>().join(", ");
             let mut line = format!("{} x {}", w_str, r_str);
@@ -247,7 +250,7 @@ fn compress_sets_internal(sets: &[Set], options: &FormatOptions) -> Vec<String> 
             }
             if same_rep.len() > 1 {
                 let w_str = same_rep.iter().map(|&w| {
-                    let line = format_weight_with_bw(w, lb, usebw);
+                    let line = format_weight_with_bw(w, lb, usebw, options);
                     color_weight_internal(&line, options)
                 }).collect::<Vec<_>>().join(", ");
                 let r_str = color_reps_internal(&r.to_string(), options);
@@ -309,7 +312,7 @@ fn summarize_workout_internal(jday: &JDay, options: &FormatOptions) -> String {
             }
             if max_weight > 0.0 {
                 let lb = eblock.sets.iter().any(|s| s.lb.unwrap_or(0.0) == 1.0);
-                let w_str = color_weight_internal(&format_weight(max_weight, lb), options);
+                let w_str = color_weight_internal(&format_weight(max_weight, lb, options), options);
                 let r_str = color_reps_internal(&max_reps.to_string(), options);
                 summaries.push(format!("#{}  {}x{}", color_exercise_internal(&ex.name, options), w_str, r_str));
             }
@@ -331,16 +334,18 @@ fn format_workout_internal(date: &str, jday: &JDay, options: &FormatOptions) -> 
         result = result.replace(&placeholder, &formatted);
     }
     let mut output = vec![color_date_internal(date, options)];
-    if let Some(bw) = jday.bw {
-        if bw > 0.0 {
-            let bwtxt = if options.user_wants_kg {
-                &format!("{:.*}", options.bw_precision, bw)
-            } else {
-                &format!("{:.*}", options.bw_precision, bw * 2.20462) // convert kg to lb
-            };
-            output.push(format!("@ {} bw", color_bw_internal(bwtxt, options)));
-        }
-    }
+     if let Some(bw) = jday.bw {
+         if bw > 0.0 {
+             let num = if options.user_wants_kg { bw } else { bw * 2.20462 };
+             let unit_str = if options.user_wants_kg { "kg" } else { "lbs" };
+             let bwtxt = if options.show_unit_name {
+                 format!("{:.*} {}", options.bw_precision, num, unit_str)
+             } else {
+                 format!("{:.*}", options.bw_precision, num)
+             };
+             output.push(format!("@ {} bw", color_bw_internal(&bwtxt, options)));
+         }
+     }
     output.push(result);
     output.join("\n")
 }

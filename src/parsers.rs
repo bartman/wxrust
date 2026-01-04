@@ -3,7 +3,7 @@ use regex::Regex;
 use lazy_static::lazy_static;
 
 lazy_static! {
-    static ref BW_REGEX: Regex = Regex::new(r"^@ *([1-9][0-9]*\.?[0-9]*) *bw$").unwrap();
+    static ref BW_REGEX: Regex = Regex::new(r"^@ *([1-9][0-9]*\.?[0-9]*) *(kg|lbs)? *bw$").unwrap();
 }
 
 #[allow(dead_code)]
@@ -118,7 +118,7 @@ pub fn parse_workout(text: &str) -> Result<JDay, String> {
 //   405, 406 x 2 cccc - ( Set { w=405, r=2, s=1, c="" }, Set { w=406, r=2, s=1, c="cccc" } )
 
 pub fn is_weight_part(s: &str) -> bool {
-    s.chars().all(|c| c.is_digit(10) || c == ',' || c == '.' || c == '+' || c == '-') || s.to_lowercase().starts_with("bw") || s.to_lowercase() == "kg" || s.to_lowercase() == "lb" || s.to_lowercase() == "lbs"
+    s.chars().all(|c| c.is_digit(10) || c == ',' || c == '.' || c == '+' || c == '-') || s.to_lowercase().starts_with("bw") || s.to_lowercase().contains("kg") || s.to_lowercase().contains("lb") || s.to_lowercase().contains("lbs")
 }
 
 pub fn parse_weight(s: &str) -> Result<(f32, bool, i32), String> {

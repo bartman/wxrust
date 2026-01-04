@@ -116,17 +116,17 @@ TM: 495
 #[test]
 fn test_parse_2025_12_12() {
     let cache_text = r#"2025-12-12
-@ 102.9650 bw
+@ 102.9650 kg bw
 531 squat C25 W3
 TM: 485
 #safety-box-squat #sq
-195 x 10
-245 x 5
-295 x 3
-375 x 5
-425 x 3
-472 x 7 hard, but rewarding
-375 x 5 AMRAP
+195 kg x 10
+245 kg x 5
+295 kg x 3
+375 kg x 5
+425 kg x 3
+472 kg x 7 hard, but rewarding
+375 kg x 5 AMRAP
 // https://fivethreeone.app/calculator?program=NU-LbsJADPwVNGcr2s3GPHxrK2ilAi3iiHpI26SA2h7IIg7R-jve3eRiz9gzHrlHDTGET8jBzi05N6VqzsTT6oPwBenxDakIjQp63JSUgTKwI3AjMEFNLaStf7uG8DOgQHiNl9YpagNZMGGrB5z2tzR8TvUd4i-XqD9G-SkWm.JZ1QRrNF4bJ3WZhy6zKjLtnKk1JouKwVqUeWGK2Qg4nTZ5o6Fn5az9L.b.Q7A6XTo-2Td.sq47D8JL3CyT3evfhA7CQS0PcfGoFhU95S8Iu.GdcAc_"#.to_string() + "\n";
 
     // Parse the cache text
@@ -161,21 +161,21 @@ TM: 485
 #[test]
 fn test_parse_2025_12_18() {
     let cache_text = r#"2025-12-18
-@ 102.9650 bw
+@ 102.9650 kg bw
 531 ohp C26 W1
 TM: 183
 #cambered-ohp #ohp
-70 x 10
-90 x 5
-110 x 3
-119, 138 x 5
-156 x 7
-120 x 10 AMRAP
+70 kg x 10
+90 kg x 5
+110 kg x 3
+119 kg, 138 kg x 5
+156 kg x 7
+120 kg x 10 AMRAP
 shoulders need more work
 #dumbbell-side-raise
-5, 10, 15 x 10
+5 kg, 10 kg, 15 kg x 10
 #weight-plate-front-raise
-25 x 10 x 3
+25 kg x 10 x 3
 // https://fivethreeone.app/calculator?program=NU-LTsMwEPyVas6ryI5jle6tRTwkWgriiHpISwpFwKEx6iHyv3dsJ5fdmd2ZHe2AFmoEe.i7vXHi3EKahRc-tzvBATrgA9oIOgoGXEjqKAXYCbgJmEjTEXpsf-pO8DmiKHhKl9Y5agNlAJ55wLFv8-Ah1xdoOP8n-VfSn1KxOd5TLbCG8Ww.q.sydIU1ibH7Qq0xRVSN1qouC1PNJ.DzaVM2DP0m9.y-KfcPivvTuQ.zty7M1m0fIHhMm7tsD-xb0EN9pGWZFitaKLotXwhex3fiFQ__"#.to_string() + "\n";
 
     // Parse the cache text
@@ -296,17 +296,17 @@ fn test_parse_set_line_examples() {
 #[test]
 fn test_parse_2025_10_31() {
     let cache_text = r#"2025-10-31
-@ 100.6980 bw
+@ 100.6980 kg bw
 531 squat C23 W3
 TM: 465
 #safety-box-squat #sq
-135 x 10
-235 x 5
-285 x 3
-350 x 5
-405 x 3
-445 x 1, 3
-350 x 5 AMRAP
+135 kg x 10
+235 kg x 5
+285 kg x 3
+350 kg x 5
+405 kg x 3
+445 kg x 1, 3
+350 kg x 5 AMRAP
 // https://fivethreeone.app/calculator?program=NU-LTsNADPyVas5W5M3GLfhWEFCp5SWOqIcUUiiCHpqteoj23-HuJhd7xp7xyANaKBN20He3uCLvmZq5kAhvCR-QAZ-QhtCZYMDFSB2pADcBPwGOZtpD9.1v3xG.RhQJ63Rpk6MeoddCeLID3vpzHj7k.gINp3PSfyf9IRWX48XUBMcWb02yui5DX1iTmHUp1DEXUTVaq7osuFpMQPJpLhsL-TEu1v9S7hGK.8OpD7O3Lsw2bR9AWKXNXbYH.5vQQyWaZZkWN2Yx0W35gvA6vhP-AQ__"#.to_string() + "\n";
 
     // Parse the cache text
