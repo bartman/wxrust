@@ -1,5 +1,5 @@
 use mockall::mock;
-use wxrust::workouts::{get_jday, get_dates};
+use wxrust::workouts::{get_jday, get_dates, read_cached_user_wants_kg, read_cached_user_wants_kg_or, write_cached_user_wants_kg};
 use wxrust::models::{GraphQLResponse, WorkoutData, JDay, EBlock, ExerciseWrapper, Exercise, Set, User};
 use base64::{Engine, engine::general_purpose};
 use tempfile::TempDir;
@@ -245,3 +245,138 @@ async fn test_get_dates_invalid_token() {
     }
 }
 
+#[test]
+fn test_read_cached_user_wants_kg_none() {
+    let _guard = ENV_MUTEX.lock().unwrap();
+    let temp_dir = TempDir::new().unwrap();
+    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
+    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+
+    // File doesn't exist
+    assert_eq!(read_cached_user_wants_kg(), None);
+
+    // Restore original XDG_CACHE_HOME
+    if let Ok(original) = original_xdg_cache {
+        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+    } else {
+        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+    }
+}
+
+#[test]
+fn test_read_cached_user_wants_kg_true() {
+    let _guard = ENV_MUTEX.lock().unwrap();
+    let temp_dir = TempDir::new().unwrap();
+    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
+    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+
+    // Create dir and file
+    let wxrust_dir = temp_dir.path().join("wxrust");
+    std::fs::create_dir_all(&wxrust_dir).unwrap();
+    std::fs::write(wxrust_dir.join("user_wants_kg"), "1\n").unwrap();
+
+    assert_eq!(read_cached_user_wants_kg(), Some(true));
+
+    // Restore original XDG_CACHE_HOME
+    if let Ok(original) = original_xdg_cache {
+        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+    } else {
+        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+    }
+}
+
+#[test]
+fn test_read_cached_user_wants_kg_false() {
+    let _guard = ENV_MUTEX.lock().unwrap();
+    let temp_dir = TempDir::new().unwrap();
+    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
+    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+
+    // Create dir and file
+    let wxrust_dir = temp_dir.path().join("wxrust");
+    std::fs::create_dir_all(&wxrust_dir).unwrap();
+    std::fs::write(wxrust_dir.join("user_wants_kg"), "0\n").unwrap();
+
+    assert_eq!(read_cached_user_wants_kg(), Some(false));
+
+    // Restore original XDG_CACHE_HOME
+    if let Ok(original) = original_xdg_cache {
+        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+    } else {
+        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+    }
+}
+
+#[test]
+fn test_read_cached_user_wants_kg_invalid() {
+    let _guard = ENV_MUTEX.lock().unwrap();
+    let temp_dir = TempDir::new().unwrap();
+    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
+    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+
+    // Create dir and file with invalid content
+    let wxrust_dir = temp_dir.path().join("wxrust");
+    std::fs::create_dir_all(&wxrust_dir).unwrap();
+    std::fs::write(wxrust_dir.join("user_wants_kg"), "invalid\n").unwrap();
+
+    // Should capture stderr, but for test, just check None
+    assert_eq!(read_cached_user_wants_kg(), None);
+
+    // Restore original XDG_CACHE_HOME
+    if let Ok(original) = original_xdg_cache {
+        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+    } else {
+        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+    }
+}
+
+#[test]
+fn test_read_cached_user_wants_kg_or() {
+    let _guard = ENV_MUTEX.lock().unwrap();
+    let temp_dir = TempDir::new().unwrap();
+    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
+    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+
+    // No file, return default
+    assert_eq!(read_cached_user_wants_kg_or(true), true);
+    assert_eq!(read_cached_user_wants_kg_or(false), false);
+
+    // With file
+    let wxrust_dir = temp_dir.path().join("wxrust");
+    std::fs::create_dir_all(&wxrust_dir).unwrap();
+    std::fs::write(wxrust_dir.join("user_wants_kg"), "0\n").unwrap();
+
+    assert_eq!(read_cached_user_wants_kg_or(true), false);
+
+    // Restore original XDG_CACHE_HOME
+    if let Ok(original) = original_xdg_cache {
+        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+    } else {
+        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+    }
+}
+
+#[test]
+fn test_write_cached_user_wants_kg() {
+    let _guard = ENV_MUTEX.lock().unwrap();
+    let temp_dir = TempDir::new().unwrap();
+    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
+    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+
+    write_cached_user_wants_kg(true);
+    let file_path = temp_dir.path().join("wxrust").join("user_wants_kg");
+    assert!(file_path.exists());
+    let content = std::fs::read_to_string(&file_path).unwrap();
+    assert_eq!(content, "1\n");
+
+    write_cached_user_wants_kg(false);
+    let content = std::fs::read_to_string(&file_path).unwrap();
+    assert_eq!(content, "0\n");
+
+    // Restore original XDG_CACHE_HOME
+    if let Ok(original) = original_xdg_cache {
+        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+    } else {
+        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+    }
+}

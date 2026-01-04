@@ -7,7 +7,7 @@ use chrono::{Datelike, Utc};
 use std::fs;
 use std::path::PathBuf;
 
-fn get_cache_dir(uid: u32) -> Result<PathBuf, String> {
+fn get_cache_base_dir() -> Result<PathBuf, String> {
     let cache_dir = if let Ok(dir) = std::env::var("XDG_CACHE_HOME") {
         if !dir.is_empty() {
             PathBuf::from(dir)
@@ -17,8 +17,49 @@ fn get_cache_dir(uid: u32) -> Result<PathBuf, String> {
     } else {
         std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".cache")).ok_or("No cache dir")?
     };
-    let full = cache_dir.join("wxrust").join(uid.to_string());
-    Ok(full)
+    Ok(cache_dir.join("wxrust"))
+}
+
+#[allow(dead_code)]
+pub fn read_cached_user_wants_kg() -> Option<bool> {
+    let cache_dir = get_cache_base_dir().ok()?;
+    let file_path = cache_dir.join("user_wants_kg");
+    if !file_path.exists() {
+        return None;
+    }
+    let content = fs::read_to_string(&file_path).ok()?;
+    match content.trim() {
+        "0" => Some(false),
+        "1" => Some(true),
+        _ => {
+            eprintln!("Warning: invalid content in user_wants_kg file");
+            None
+        }
+    }
+}
+
+#[allow(dead_code)]
+pub fn read_cached_user_wants_kg_or(default: bool) -> bool {
+    read_cached_user_wants_kg().unwrap_or(default)
+}
+
+#[allow(dead_code)]
+pub fn write_cached_user_wants_kg(value: bool) {
+    if let Ok(cache_dir) = get_cache_base_dir() {
+        let file_path = cache_dir.join("user_wants_kg");
+        if let Some(parent) = file_path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let content = if value { "1\n" } else { "0\n" };
+        let temp_path = file_path.with_extension("tmp");
+        if let Ok(()) = fs::write(&temp_path, content) {
+            let _ = fs::rename(&temp_path, &file_path);
+        }
+    }
+}
+
+fn get_cache_dir(uid: u32) -> Result<PathBuf, String> {
+    Ok(get_cache_base_dir()?.join(uid.to_string()))
 }
 
 fn get_cache_file_path(uid: u32, date: &str) -> Result<PathBuf, String> {
