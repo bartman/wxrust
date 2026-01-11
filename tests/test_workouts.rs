@@ -49,7 +49,16 @@ async fn test_get_jday_graphql_error() {
             })
         });
 
-    let result = get_jday(&mock_client, &token, "2023-10-01", false).await;
+    let data_access = wxrust::api::DataAccess {
+        client: &mock_client,
+        token: Some(&token),
+        uid: Some(123),
+        use_network: true,
+        use_cache: true,
+        write_cache: true,
+    };
+
+    let result = get_jday(&data_access, "2023-10-01", false).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("GraphQL error"));
 
@@ -111,7 +120,16 @@ async fn test_get_jday_success() {
         .times(0)
         .returning(|_| true);
 
-    let result = get_jday(&mock_client, &token, "2023-10-01", false).await;
+    let data_access = wxrust::api::DataAccess {
+        client: &mock_client,
+        token: Some(&token),
+        uid: Some(123),
+        use_network: true,
+        use_cache: true,
+        write_cache: true,
+    };
+
+    let result = get_jday(&data_access, "2023-10-01", false).await;
     assert!(result.is_ok());
     let jday = result.unwrap();
     assert_eq!(jday.log, "Date: 2023-10-01");
@@ -152,7 +170,16 @@ async fn test_get_jday_no_workout() {
         .times(0) // shouldn't be called
         .returning(|_| true);
 
-    let result = get_jday(&mock_client, &token, "2023-10-01", false).await;
+    let data_access = wxrust::api::DataAccess {
+        client: &mock_client,
+        token: Some(&token),
+        uid: Some(123),
+        use_network: true,
+        use_cache: true,
+        write_cache: true,
+    };
+
+    let result = get_jday(&data_access, "2023-10-01", false).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("No workout found"));
 
@@ -173,8 +200,24 @@ async fn test_get_jday_invalid_token() {
     unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
 
     let token = "invalid";
-    let mock_client = MockApiClient::new();
-    let result = get_jday(&mock_client, &token, "2023-10-01", false).await;
+    let mut mock_client = MockApiClient::new();
+    // Expect the graphql call to fail with an auth error
+    mock_client
+        .expect_graphql_request::<wxrust::models::WorkoutData>()
+        .times(1)
+        .returning(|_, _, _| {
+            Err("Authentication error".into())
+        });
+
+    let data_access = wxrust::api::DataAccess {
+        client: &mock_client,
+        token: Some(&token),
+        uid: Some(123),
+        use_network: true,
+        use_cache: true,
+        write_cache: true,
+    };
+    let result = get_jday(&data_access, "2023-10-01", false).await;
     assert!(result.is_err());
 
     // Restore original XDG_CACHE_HOME
@@ -214,7 +257,16 @@ async fn test_get_dates_success() {
             })
         });
 
-    let result = get_dates(&mock_client, &token, None, None, 1, false).await;
+    let data_access = wxrust::api::DataAccess {
+        client: &mock_client,
+        token: Some(&token),
+        uid: Some(123),
+        use_network: true,
+        use_cache: true,
+        write_cache: true,
+    };
+
+    let result = get_dates(&data_access, None, None, 1, false).await;
     assert!(result.is_ok());
     let dates = result.unwrap();
     assert_eq!(dates.len(), 1);
@@ -236,8 +288,24 @@ async fn test_get_dates_invalid_token() {
     unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
 
     let token = "invalid";
-    let mock_client = MockApiClient::new();
-    let result = get_dates(&mock_client, &token, None, None, 1, false).await;
+    let mut mock_client = MockApiClient::new();
+    // Expect the graphql call to fail with an auth error
+    mock_client
+        .expect_graphql_request::<wxrust::models::GetJRangeData>()
+        .times(1)
+        .returning(|_, _, _| {
+            Err("Authentication error".into())
+        });
+
+    let data_access = wxrust::api::DataAccess {
+        client: &mock_client,
+        token: Some(&token),
+        uid: Some(123),
+        use_network: true,
+        use_cache: true,
+        write_cache: true,
+    };
+    let result = get_dates(&data_access, None, None, 1, false).await;
     assert!(result.is_err());
 
     // Restore original XDG_CACHE_HOME

@@ -46,7 +46,7 @@ async fn test_login_success() {
     credentials::set_credentials_path(&credentials_path.to_string_lossy());
     let credentials_path = credentials::get_credentials_path().unwrap();
 
-    let result = login(&mock_client, &credentials_path.as_str(), &token_path.to_string_lossy()).await;
+    let result = login(&mock_client, &credentials_path.as_str(), &token_path.to_string_lossy(), false).await;
     assert!(result.is_ok());
     let returned_token = result.unwrap();
     assert!(returned_token.starts_with(&header));
@@ -77,7 +77,7 @@ async fn test_login_invalid_credentials() {
     credentials::set_credentials_path(&credentials_path.to_string_lossy());
     let credentials_path = credentials::get_credentials_path().unwrap();
 
-    let result = login(&mock_client, &credentials_path.as_str(), &token_path.to_string_lossy()).await;
+    let result = login(&mock_client, &credentials_path.as_str(), &token_path.to_string_lossy(), false).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("Invalid credentials"));
 }
