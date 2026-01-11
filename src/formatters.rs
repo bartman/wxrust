@@ -125,13 +125,13 @@ fn color_sets_internal(s: &str, options: &FormatOptions) -> String {
 
 
 
-pub fn format_weight(w: f32, lb: bool, options: &FormatOptions) -> String {
+pub fn format_weight(w: f32, w_in_lbs: bool, options: &FormatOptions) -> String {
     let display_in_lbs = !options.user_wants_kg;
-    let num = if lb && display_in_lbs {
+    let num = if w_in_lbs && display_in_lbs {
         w
-    } else if lb && !display_in_lbs {
+    } else if w_in_lbs && !display_in_lbs {
         w / 2.20462
-    } else if !lb && display_in_lbs {
+    } else if !w_in_lbs && display_in_lbs {
         w * 2.20462
     } else {
         w
@@ -144,19 +144,19 @@ pub fn format_weight(w: f32, lb: bool, options: &FormatOptions) -> String {
     }
 }
 
-pub fn format_weight_with_bw(w: f32, lb: bool, usebw: i32, options: &FormatOptions) -> String {
+pub fn format_weight_with_bw(w: f32, w_in_lbs: bool, usebw: i32, options: &FormatOptions) -> String {
     if usebw != 0 {
         if w > 0.0 {
             if usebw > 0 {
-                format!("BW+{}", format_weight(w, lb, options))
+                format!("BW+{}", format_weight(w, w_in_lbs, options))
             } else {
-                format!("BW-{}", format_weight(w, lb, options))
+                format!("BW-{}", format_weight(w, w_in_lbs, options))
             }
         } else {
             "BW".to_string()
         }
     } else {
-        format_weight(w, lb, options)
+        format_weight(w, w_in_lbs, options)
     }
 }
 
@@ -171,9 +171,9 @@ fn format_set_internal(set: &Set, options: &FormatOptions) -> String {
     let r = set.r.unwrap_or(0);
     let s = set.s.unwrap_or(1);
     let rpe = set.rpe.unwrap_or(0.0);
-    let lb = set.lb.unwrap_or(0.0) == 1.0;
+    let w_in_lbs = false; //set.lb.unwrap_or(0.0) == 1.0;
     let usebw = set.usebw.unwrap_or(0);
-    let line = format_weight_with_bw(w, lb, usebw, options);
+    let line = format_weight_with_bw(w, w_in_lbs, usebw, options);
     let w_str = color_weight_internal(&line, options);
     let mut line = w_str;
     if r > 0 {
@@ -214,7 +214,7 @@ fn compress_sets_internal(sets: &[Set], options: &FormatOptions) -> Vec<String> 
         let r = set.r.unwrap_or(0);
         let _s = set.s.unwrap_or(1);
         let rpe = set.rpe.unwrap_or(0.0);
-        let lb = set.lb.unwrap_or(0.0) == 1.0;
+        let w_in_lbs = false; //set.lb.unwrap_or(0.0) == 1.0;
         let usebw = set.usebw.unwrap_or(0);
         // check for same weight consecutive
         let mut same_weight = vec![r];
@@ -228,7 +228,7 @@ fn compress_sets_internal(sets: &[Set], options: &FormatOptions) -> Vec<String> 
             j += 1;
         }
         if same_weight.len() > 1 {
-            let line = format_weight_with_bw(w, lb, usebw, options);
+            let line = format_weight_with_bw(w, w_in_lbs, usebw, options);
             let w_str = color_weight_internal(&line, options);
             let r_str = same_weight.iter().map(|&r| color_reps_internal(&r.to_string(), options)).collect::<Vec<_>>().join(", ");
             let mut line = format!("{} x {}", w_str, r_str);
@@ -251,7 +251,7 @@ fn compress_sets_internal(sets: &[Set], options: &FormatOptions) -> Vec<String> 
             }
             if same_rep.len() > 1 {
                 let w_str = same_rep.iter().map(|&w| {
-                    let line = format_weight_with_bw(w, lb, usebw, options);
+                    let line = format_weight_with_bw(w, w_in_lbs, usebw, options);
                     color_weight_internal(&line, options)
                 }).collect::<Vec<_>>().join(", ");
                 let r_str = color_reps_internal(&r.to_string(), options);
@@ -312,8 +312,8 @@ fn summarize_workout_internal(jday: &JDay, options: &FormatOptions) -> String {
                 }
             }
             if max_weight > 0.0 {
-                let lb = eblock.sets.iter().any(|s| s.lb.unwrap_or(0.0) == 1.0);
-                let w_str = color_weight_internal(&format_weight(max_weight, lb, options), options);
+                let w_in_lbs = false; //eblock.sets.iter().any(|s| s.lb.unwrap_or(0.0) == 1.0);
+                let w_str = color_weight_internal(&format_weight(max_weight, w_in_lbs, options), options);
                 let r_str = color_reps_internal(&max_reps.to_string(), options);
                 summaries.push(format!("#{}  {}x{}", color_exercise_internal(&ex.name, options), w_str, r_str));
             }

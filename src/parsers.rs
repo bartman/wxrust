@@ -318,27 +318,30 @@ pub fn parse_set_line(line: &str) -> Result<Vec<Set>, String> {
         }
     }
     // Determine lb and usebw
-    let mut lb = 0.0;
+    let store_w_in_lbs = false;
+    let mut show_lb = 0.0;
     let mut usebw = 0;
-    let mut w_vals = Vec::new();
-    for (v, is_lb, ubw) in weights {
-        if is_lb {
-            lb = 1.0;
+    for (_, parsed_lb, ubw) in &weights {
+        if *parsed_lb {
+            show_lb = 1.0;
         }
-        if ubw != 0 {
-            usebw = ubw;
+        if *ubw != 0 {
+            usebw = *ubw;
         }
-        w_vals.push(v);
     }
     // Now create the sets
     let mut result = Vec::new();
-    for &w in &w_vals {
+    for (w, parsed_lb, _) in weights {
+        let mut w_in_kg = w;
+        if parsed_lb && store_w_in_lbs {
+            w_in_kg = w / 2.20462
+        }
         for &r in &reps {
             result.push(Set {
-                w: Some(w),
+                w: Some(w_in_kg),
                 r: Some(r),
                 s: Some(sets),
-                lb: Some(lb),
+                lb: Some(show_lb),
                 rpe,
                 c: final_comment.clone(),
                 set_type: Some(0),
