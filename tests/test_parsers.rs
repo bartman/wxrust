@@ -194,6 +194,10 @@ shoulders need more work
     // Parse the cache text
     let parsed_jday = parse_workout(&cache_text).unwrap();
 
+    // in this test our input and output is lbs
+    forget_cached_user_wants_kg();
+    write_cached_user_wants_kg(false);
+
     // The parsed JDay should have the correct structure
     assert_eq!(parsed_jday.bw, Some(102.9656));
     assert_eq!(parsed_jday.exercises.len(), 3);
