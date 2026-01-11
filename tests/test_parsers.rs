@@ -1,6 +1,7 @@
 use wxrust::parsers::*;
 use wxrust::formatters::*;
 use wxrust::models::{JDay, Set, Exercise, ExerciseWrapper, EBlock};
+use wxrust::workouts::{forget_cached_user_wants_kg, write_cached_user_wants_kg};
 
 #[test]
 fn test_parse_workout_simple() {
@@ -95,6 +96,10 @@ TM: 495
     // Parse the cache text
     let parsed_jday = parse_workout(&cache_text).unwrap();
 
+    // in this test our input and output is lbs
+    forget_cached_user_wants_kg();
+    write_cached_user_wants_kg(false);
+
     // The parsed JDay should have the correct structure
     assert_eq!(parsed_jday.bw, Some(105.0));
     assert_eq!(parsed_jday.exercises.len(), 1);
@@ -116,24 +121,28 @@ TM: 495
 #[test]
 fn test_parse_2025_12_12() {
     let cache_text = r#"2025-12-12
-@ 102.9650 kg bw
+@ 227.0000 lbs bw
 531 squat C25 W3
 TM: 485
 #safety-box-squat #sq
-195 kg x 10
-245 kg x 5
-295 kg x 3
-375 kg x 5
-425 kg x 3
-472 kg x 7 hard, but rewarding
-375 kg x 5 AMRAP
+195 lbs x 10
+245 lbs x 5
+295 lbs x 3
+375 lbs x 5
+425 lbs x 3
+472 lbs x 7 hard, but rewarding
+375 lbs x 5 AMRAP
 // https://fivethreeone.app/calculator?program=NU-LbsJADPwVNGcr2s3GPHxrK2ilAi3iiHpI26SA2h7IIg7R-jve3eRiz9gzHrlHDTGET8jBzi05N6VqzsTT6oPwBenxDakIjQp63JSUgTKwI3AjMEFNLaStf7uG8DOgQHiNl9YpagNZMGGrB5z2tzR8TvUd4i-XqD9G-SkWm.JZ1QRrNF4bJ3WZhy6zKjLtnKk1JouKwVqUeWGK2Qg4nTZ5o6Fn5az9L.b.Q7A6XTo-2Td.sq47D8JL3CyT3evfhA7CQS0PcfGoFhU95S8Iu.GdcAc_"#.to_string() + "\n";
 
     // Parse the cache text
     let parsed_jday = parse_workout(&cache_text).unwrap();
 
+    // in this test our input and output is lbs
+    forget_cached_user_wants_kg();
+    write_cached_user_wants_kg(false);
+
     // The parsed JDay should have the correct structure
-    assert_eq!(parsed_jday.bw, Some(102.9650));
+    assert_eq!(parsed_jday.bw, Some(102.9656));
     assert_eq!(parsed_jday.exercises.len(), 1);
     assert_eq!(parsed_jday.exercises[0].exercise.name, "safety-box-squat #sq");
     assert_eq!(parsed_jday.eblocks.len(), 1);
@@ -161,28 +170,28 @@ TM: 485
 #[test]
 fn test_parse_2025_12_18() {
     let cache_text = r#"2025-12-18
-@ 102.9650 kg bw
+@ 227.0000 lbs bw
 531 ohp C26 W1
 TM: 183
 #cambered-ohp #ohp
-70 kg x 10
-90 kg x 5
-110 kg x 3
-119 kg, 138 kg x 5
-156 kg x 7
-120 kg x 10 AMRAP
+70 lbs x 10
+90 lbs x 5
+110 lbs x 3
+119 lbs, 138 lbs x 5
+156 lbs x 7
+120 lbs x 10 AMRAP
 shoulders need more work
 #dumbbell-side-raise
-5 kg, 10 kg, 15 kg x 10
+5 lbs, 10 lbs, 15 lbs x 10
 #weight-plate-front-raise
-25 kg x 10 x 3
+25 lbs x 10 x 3
 // https://fivethreeone.app/calculator?program=NU-LTsMwEPyVas6ryI5jle6tRTwkWgriiHpISwpFwKEx6iHyv3dsJ5fdmd2ZHe2AFmoEe.i7vXHi3EKahRc-tzvBATrgA9oIOgoGXEjqKAXYCbgJmEjTEXpsf-pO8DmiKHhKl9Y5agNlAJ55wLFv8-Ah1xdoOP8n-VfSn1KxOd5TLbCG8Ww.q.sydIU1ibH7Qq0xRVSN1qouC1PNJ.DzaVM2DP0m9.y-KfcPivvTuQ.zty7M1m0fIHhMm7tsD-xb0EN9pGWZFitaKLotXwhex3fiFQ__"#.to_string() + "\n";
 
     // Parse the cache text
     let parsed_jday = parse_workout(&cache_text).unwrap();
 
     // The parsed JDay should have the correct structure
-    assert_eq!(parsed_jday.bw, Some(102.9650));
+    assert_eq!(parsed_jday.bw, Some(102.9656));
     assert_eq!(parsed_jday.exercises.len(), 3);
     assert_eq!(parsed_jday.exercises[0].exercise.name, "cambered-ohp #ohp");
     assert_eq!(parsed_jday.exercises[1].exercise.name, "dumbbell-side-raise");
@@ -296,24 +305,28 @@ fn test_parse_set_line_examples() {
 #[test]
 fn test_parse_2025_10_31() {
     let cache_text = r#"2025-10-31
-@ 100.6980 kg bw
+@ 222.0000 lbs bw
 531 squat C23 W3
 TM: 465
 #safety-box-squat #sq
-135 kg x 10
-235 kg x 5
-285 kg x 3
-350 kg x 5
-405 kg x 3
-445 kg x 1, 3
-350 kg x 5 AMRAP
+135 lbs x 10
+235 lbs x 5
+285 lbs x 3
+350 lbs x 5
+405 lbs x 3
+445 lbs x 1, 3
+350 lbs x 5 AMRAP
 // https://fivethreeone.app/calculator?program=NU-LTsNADPyVas5W5M3GLfhWEFCp5SWOqIcUUiiCHpqteoj23-HuJhd7xp7xyANaKBN20He3uCLvmZq5kAhvCR-QAZ-QhtCZYMDFSB2pADcBPwGOZtpD9.1v3xG.RhQJ63Rpk6MeoddCeLID3vpzHj7k.gINp3PSfyf9IRWX48XUBMcWb02yui5DX1iTmHUp1DEXUTVaq7osuFpMQPJpLhsL-TEu1v9S7hGK.8OpD7O3Lsw2bR9AWKXNXbYH.5vQQyWaZZkWN2Yx0W35gvA6vhP-AQ__"#.to_string() + "\n";
 
     // Parse the cache text
     let parsed_jday = parse_workout(&cache_text).unwrap();
 
+    // in this test our input and output is lbs
+    forget_cached_user_wants_kg();
+    write_cached_user_wants_kg(false);
+
     // The parsed JDay should have the correct structure
-    assert_eq!(parsed_jday.bw, Some(100.6980));
+    assert_eq!(parsed_jday.bw, Some(100.69763));
     assert_eq!(parsed_jday.exercises.len(), 1);
     assert_eq!(parsed_jday.exercises[0].exercise.name, "safety-box-squat #sq");
     assert_eq!(parsed_jday.eblocks.len(), 1);
