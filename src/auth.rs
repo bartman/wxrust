@@ -19,16 +19,18 @@ struct CachedToken {
     exp: u64,
 }
 
-pub async fn login<C: crate::api::ApiClient>(client: &C, credentials_path: &str, token_path: &str) -> Result<String, String> {
-    // Check if token file exists and is valid
-    if let Ok(contents) = fs::read_to_string(token_path) {
-        if let Ok(cached) = serde_json::from_str::<CachedToken>(&contents) {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
-            if cached.exp > now {
-                return Ok(cached.token);
+pub async fn login<C: crate::api::ApiClient>(client: &C, credentials_path: &str, token_path: &str, force_auth: bool) -> Result<String, String> {
+    // Check if token file exists and is valid (unless force_auth is true)
+    if !force_auth {
+        if let Ok(contents) = fs::read_to_string(token_path) {
+            if let Ok(cached) = serde_json::from_str::<CachedToken>(&contents) {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+                if cached.exp > now {
+                    return Ok(cached.token);
+                }
             }
         }
     }
@@ -81,4 +83,18 @@ pub fn decode_token(token: &str) -> Result<Claims, Box<dyn std::error::Error>> {
     let decoded = general_purpose::URL_SAFE_NO_PAD.decode(payload)?;
     let claims: Claims = serde_json::from_slice(&decoded)?;
     Ok(claims)
+}
+
+pub fn load_uid_from_cache(token_path: &str) -> Result<u32, String> {
+    let contents = fs::read_to_string(token_path).map_err(|_| format!("Token file {} not found", token_path))?;
+    let cached: CachedToken = serde_json::from_str(&contents).map_err(|_| "Invalid token cache format".to_string())?;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    if cached.exp > now {
+        Ok(cached.uid)
+    } else {
+        Err("Cached token expired".to_string())
+    }
 }

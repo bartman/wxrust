@@ -18,6 +18,15 @@ pub trait ApiClient: Send + Sync {
     async fn user_wants_kg(&self, token: &str) -> bool;
 }
 
+pub struct DataAccess<'a, C: ApiClient> {
+    pub client: &'a C,
+    pub token: Option<&'a str>,
+    pub uid: Option<u32>,
+    pub use_network: bool,
+    pub use_cache: bool,
+    pub write_cache: bool,
+}
+
 #[derive(Clone)]
 pub struct ReqwestClient {
     client: Client,

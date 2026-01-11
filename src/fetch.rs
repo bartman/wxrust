@@ -1,5 +1,4 @@
 use crate::api::{ReqwestClient, ApiClient};
-use crate::auth;
 use crate::formatters;
 use crate::models;
 use crate::parsers;
@@ -10,22 +9,20 @@ use regex::Regex;
 use std::fs;
 
 pub async fn fetch_command(
-    client: &ReqwestClient,
-    token: &str,
+    data_access: &crate::api::DataAccess<'_, ReqwestClient>,
     dates: &[String],
     diff: bool,
     force: bool,
     file: Option<&str>,
     verbose: bool,
 ) -> Result<(), String> {
-    let claims = auth::decode_token(&token).map_err(|e| e.to_string())?;
-    let uid = claims.id;
+    let uid = data_access.uid.ok_or("No user ID available")?;
 
     if let Some(file_path) = file {
         return fetch_from_file(uid, file_path, verbose);
     }
 
-    let dates_to_fetch = get_dates_to_fetch(client, token, dates).await?;
+    let dates_to_fetch = get_dates_to_fetch(data_access, dates).await?;
 
     if dates_to_fetch.is_empty() {
         println!("No dates to fetch");
@@ -44,14 +41,15 @@ pub async fn fetch_command(
         pb.set_message(format!("Fetching {}", date));
 
         if diff {
-            let server_jday = workouts::get_jday(client, token, date, verbose).await?;
+            let server_jday = workouts::get_jday(data_access, date, verbose).await?;
             let local_jday = workouts::lookup_cached_jday(uid, date, verbose);
 
             if let Some(local) = local_jday {
                 show_diff(date, &local, &server_jday);
             } else {
                 println!("{}: No local cache, server version:", date);
-                let user_wants_kg = client.user_wants_kg(token).await;
+                let token = data_access.token.ok_or("No token available for user preferences")?;
+                let user_wants_kg = data_access.client.user_wants_kg(token).await;
                 let workout = formatters::format_workout(date, &server_jday, user_wants_kg);
                 print!("{}", workout);
             }
@@ -59,7 +57,7 @@ pub async fn fetch_command(
             if !force && workouts::lookup_cached_jday(uid, date, verbose).is_some() {
                 pb.println(format!("{} already cached, skipping", date));
             } else {
-                let jday = workouts::get_jday(client, token, date, verbose).await?;
+                let jday = workouts::get_jday(data_access, date, verbose).await?;
                 workouts::write_cached_jday(uid, date, &jday);
             }
         }
@@ -127,13 +125,11 @@ fn parse_file_export(content: &str) -> Result<Vec<(String, models::JDay)>, Strin
 }
 
 async fn get_dates_to_fetch(
-    client: &ReqwestClient,
-    token: &str,
+    data_access: &crate::api::DataAccess<'_, ReqwestClient>,
     dates: &[String],
 ) -> Result<Vec<String>, String> {
     if dates.is_empty() {
-        // Fetch all dates
-        workouts::get_dates(client, token, None, None, 10000, false).await
+        workouts::get_dates(data_access, None, None, 10000, false).await
     } else {
         let mut all_dates: Vec<String> = vec![];
         for range_str in dates {
@@ -144,7 +140,7 @@ async fn get_dates_to_fetch(
                 }
             };
             let count = ((oldest - latest).num_days().abs() + 1) as u32;
-            let dates = match workouts::get_dates(client, token, Some(latest.to_string()), Some(oldest.to_string()), count, false).await {
+            let dates = match workouts::get_dates(data_access, Some(latest.to_string()), Some(oldest.to_string()), count, false).await {
                 Ok(d) => d,
                 Err(e) => {
                     return Err(format!("Error getting dates for range {}: {}", range_str, e));

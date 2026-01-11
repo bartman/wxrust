@@ -22,6 +22,15 @@ struct Args {
     #[arg(short = 'a', long = "force-authentication")]
     force_auth: bool,
 
+    #[arg(long)]
+    no_network: bool,
+
+    #[arg(long)]
+    no_cache: bool,
+
+    #[arg(long)]
+    no_cache_write: bool,
+
     #[arg(long, default_value = "auto")]
     color: String,
 
@@ -90,6 +99,13 @@ struct FetchArgs {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
+
+    // Validate mutually exclusive options
+    if args.no_network && args.no_cache {
+        eprintln!("Error: --no-network and --no-cache are mutually exclusive");
+        std::process::exit(1);
+    }
+
     unsafe { std::env::set_var("WXRUST_COLOR", &args.color); }
 
     let token_path = if let Some(config_dir) = dirs::config_dir() {
@@ -126,19 +142,51 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match args.command {
         Commands::List(list) => {
             let client = ReqwestClient::new_with_verbose(args.verbose);
-            let token = match auth::login(&client, &credentials_path.as_str(), &token_path).await {
-                Ok(t) => t,
-                Err(e) => {
-                    eprintln!("{}", e);
-                    std::process::exit(1);
-                }
+
+            let (token, uid) = if args.no_network {
+                // Load uid from cached token, no network login
+                let uid = match auth::load_uid_from_cache(&token_path) {
+                    Ok(u) => u,
+                    Err(e) => {
+                        eprintln!("Failed to load cached token: {}", e);
+                        eprintln!("Use without --no-network to authenticate first.");
+                        std::process::exit(1);
+                    }
+                };
+                (None, Some(uid))
+            } else {
+                // Normal login
+                let token = match auth::login(&client, &credentials_path.as_str(), &token_path, args.force_auth).await {
+                    Ok(t) => t,
+                    Err(e) => {
+                        eprintln!("{}", e);
+                        std::process::exit(1);
+                    }
+                };
+                let uid = match auth::decode_token(&token) {
+                    Ok(claims) => claims.id,
+                    Err(e) => {
+                        eprintln!("Failed to decode token: {}", e);
+                        std::process::exit(1);
+                    }
+                };
+                let _user = match client.get_user_info(&token).await {
+                    Ok(u) => u,
+                    Err(e) => {
+                        eprintln!("{}", e);
+                        std::process::exit(1);
+                    }
+                };
+                (Some(token), Some(uid))
             };
-            let _user = match client.get_user_info(&token).await {
-                Ok(u) => u,
-                Err(e) => {
-                    eprintln!("{}", e);
-                    std::process::exit(1);
-                }
+
+            let data_access = crate::api::DataAccess {
+                client: &client,
+                token: token.as_deref(),
+                uid,
+                use_network: !args.no_network,
+                use_cache: !args.no_cache,
+                write_cache: !args.no_cache_write,
             };
             let dates_to_use = if list.dates.is_empty() {
                 let (latest, oldest, count) = if list.all {
@@ -152,7 +200,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     (None, None, 32)
                 };
 
-                match workouts::get_dates(&client, &token, latest, oldest, count, list.reverse).await {
+                match workouts::get_dates(&data_access, latest, oldest, count, list.reverse).await {
                     Ok(d) => d,
                     Err(e) => {
                         eprintln!("{}", e);
@@ -171,7 +219,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     };
                     let count = ((oldest - latest).num_days().abs() + 1) as u32;
-                    let dates = match workouts::get_dates(&client, &token,
+                    let dates = match workouts::get_dates(&data_access,
                                         Some(latest.to_string()), Some(oldest.to_string()), count, false).await {
                         Ok(d) => d,
                         Err(e) => {
@@ -194,15 +242,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             if list.details || list.summary {
-                let user_wants_kg = client.user_wants_kg(&token).await;
+                let user_wants_kg = if let Some(token_ref) = &token {
+                    data_access.client.user_wants_kg(token_ref).await
+                } else {
+                    // No network mode: use cached preference
+                    crate::workouts::read_cached_user_wants_kg_or(true)
+                };
                 let (tx, mut rx) = tokio::sync::mpsc::channel(32);
                 for (seq, date) in dates_to_use.iter().enumerate() {
                     let date = date.clone();
                     let client_clone = client.clone();
-                    let token_clone = token.clone();
+                    let data_access_clone = crate::api::DataAccess {
+                        client: &client_clone,
+                        token: token.as_deref(),
+                        uid: data_access.uid,
+                        use_network: data_access.use_network,
+                        use_cache: data_access.use_cache,
+                        write_cache: data_access.write_cache,
+                    };
                     let tx_clone = tx.clone();
                     tokio::spawn(async move {
-                        let result = match workouts::get_jday(&client_clone, &token_clone, &date, args.verbose).await {
+                        let result = match workouts::get_jday(&data_access_clone, &date, args.verbose).await {
                             Ok(jday) => Some(jday),
                             Err(e) => {
                                 eprintln!("Error getting workout for {}: {}", date, e);
@@ -242,22 +302,54 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!("{}", date);
                 }
             }
-        }
+        },
         Commands::Show(show) => {
             let client = ReqwestClient::new_with_verbose(args.verbose);
-            let token = match auth::login(&client, &credentials_path.as_str(), &token_path).await {
-                Ok(t) => t,
-                Err(e) => {
-                    eprintln!("{}", e);
-                    std::process::exit(1);
-                }
+
+            let (token, uid) = if args.no_network {
+                // Load uid from cached token, no network login
+                let uid = match auth::load_uid_from_cache(&token_path) {
+                    Ok(u) => u,
+                    Err(e) => {
+                        eprintln!("Failed to load cached token: {}", e);
+                        eprintln!("Use without --no-network to authenticate first.");
+                        std::process::exit(1);
+                    }
+                };
+                (None, Some(uid))
+            } else {
+                // Normal login
+                let token = match auth::login(&client, &credentials_path.as_str(), &token_path, args.force_auth).await {
+                    Ok(t) => t,
+                    Err(e) => {
+                        eprintln!("{}", e);
+                        std::process::exit(1);
+                    }
+                };
+                let uid = match auth::decode_token(&token) {
+                    Ok(claims) => claims.id,
+                    Err(e) => {
+                        eprintln!("Failed to decode token: {}", e);
+                        std::process::exit(1);
+                    }
+                };
+                (Some(token), Some(uid))
+            };
+
+            let data_access = crate::api::DataAccess {
+                client: &client,
+                token: token.as_deref(),
+                uid,
+                use_network: !args.no_network,
+                use_cache: !args.no_cache,
+                write_cache: !args.no_cache_write,
             };
 
             let date = if let Some(d) = show.date {
                 d
             } else {
                 // Show last workout
-                let dates = match workouts::get_dates(&client, &token, None, None, 1, false).await {
+                let dates = match workouts::get_dates(&data_access, None, None, 1, false).await {
                     Ok(d) => d,
                     Err(e) => {
                         eprintln!("{}", e);
@@ -272,7 +364,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             };
 
-            let jday = match workouts::get_jday(&client, &token, &date, args.verbose).await {
+            let jday = match workouts::get_jday(&data_access, &date, args.verbose).await {
                 Ok(j) => j,
                 Err(e) => {
                     eprintln!("{}", e);
@@ -285,27 +377,63 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let summary = formatters::summarize_workout(&jday);
                 println!("{} {}", fmt_date, summary);
             } else {
-                let user_wants_kg = client.user_wants_kg(&token).await;
+                let user_wants_kg = if let Some(token_ref) = &token {
+                    data_access.client.user_wants_kg(token_ref).await
+                } else {
+                    // No network mode: use cached preference
+                    crate::workouts::read_cached_user_wants_kg_or(true)
+                };
                 let workout = formatters::format_workout(&date, &jday, user_wants_kg);
                 print!("{}", workout);
                 if !workout.ends_with('\n') {
                     println!();
                 }
             }
-        }
+        },
         Commands::Fetch(fetch_args) => {
             let client = ReqwestClient::new_with_verbose(args.verbose);
-            let token = match auth::login(&client, &credentials_path.as_str(), &token_path).await {
-                Ok(t) => t,
-                Err(e) => {
-                    eprintln!("{}", e);
-                    std::process::exit(1);
-                }
+
+            let (token, uid) = if args.no_network {
+                // Load uid from cached token, no network login
+                let uid = match auth::load_uid_from_cache(&token_path) {
+                    Ok(u) => u,
+                    Err(e) => {
+                        eprintln!("Failed to load cached token: {}", e);
+                        eprintln!("Use without --no-network to authenticate first.");
+                        std::process::exit(1);
+                    }
+                };
+                (None, Some(uid))
+            } else {
+                // Normal login
+                let token = match auth::login(&client, &credentials_path.as_str(), &token_path, args.force_auth).await {
+                    Ok(t) => t,
+                    Err(e) => {
+                        eprintln!("{}", e);
+                        std::process::exit(1);
+                    }
+                };
+                let uid = match auth::decode_token(&token) {
+                    Ok(claims) => claims.id,
+                    Err(e) => {
+                        eprintln!("Failed to decode token: {}", e);
+                        std::process::exit(1);
+                    }
+                };
+                (Some(token), Some(uid))
+            };
+
+            let data_access = crate::api::DataAccess {
+                client: &client,
+                token: token.as_deref(),
+                uid,
+                use_network: !args.no_network,
+                use_cache: !args.no_cache,
+                write_cache: !args.no_cache_write,
             };
 
             if let Err(e) = fetch::fetch_command(
-                &client,
-                &token,
+                &data_access,
                 &fetch_args.dates,
                 fetch_args.diff,
                 fetch_args.force,

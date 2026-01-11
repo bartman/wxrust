@@ -1,5 +1,4 @@
 use crate::api;
-use crate::auth;
 use crate::formatters;
 use crate::models;
 use crate::parsers;
@@ -89,6 +88,68 @@ fn get_cache_file_path(uid: u32, date: &str) -> Result<PathBuf, String> {
     Ok(cache_dir.join(format!("{}.txt", date)))
 }
 
+pub fn get_dates_from_cache(uid: u32, latest: Option<String>, oldest: Option<String>, count: u32, reverse: bool) -> Result<Vec<String>, String> {
+    let cache_dir = get_cache_dir(uid)?;
+    if !cache_dir.exists() {
+        return Ok(vec![]);
+    }
+
+    let mut dates: Vec<String> = vec![];
+    let entries = fs::read_dir(&cache_dir).map_err(|e| format!("Failed to read cache dir: {}", e))?;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("Failed to read dir entry: {}", e))?;
+        let path = entry.path();
+        if path.is_file() {
+            if let Some(ext) = path.extension() {
+                if ext == "txt" {
+                    if let Some(stem) = path.file_stem() {
+                        if let Some(date_str) = stem.to_str() {
+                            // Basic validation: should be YYYY-MM-DD format
+                            if date_str.len() == 10 && date_str.chars().nth(4) == Some('-') && date_str.chars().nth(7) == Some('-') {
+                                dates.push(date_str.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Sort dates
+    dates.sort();
+
+    // Filter by oldest and latest
+    let mut filtered: Vec<String> = dates.into_iter()
+        .filter(|d| {
+            if let Some(old) = &oldest {
+                d >= old
+            } else {
+                true
+            }
+        })
+        .filter(|d| {
+            if let Some(lat) = &latest {
+                d <= lat
+            } else {
+                true
+            }
+        })
+        .collect();
+
+    // Take the most recent count if specified
+    if count > 0 {
+        filtered = filtered.into_iter().rev().take(count as usize).collect();
+        filtered.sort();
+    }
+
+    if reverse {
+        filtered.reverse();
+    }
+
+    Ok(filtered)
+}
+
 pub fn lookup_cached_jday(uid: u32, date: &str, verbose: bool) -> Option<models::JDay> {
     if let Ok(cache_path) = get_cache_file_path(uid, date) {
         if cache_path.exists() {
@@ -125,14 +186,22 @@ pub fn write_cached_jday(uid: u32, date: &str, jday: &models::JDay) {
 }
 
 #[allow(unreachable_code)]
-pub async fn get_jday<C: crate::api::ApiClient>(client: &C, token: &str, date: &str, verbose: bool) -> Result<models::JDay, String> {
-    let claims = auth::decode_token(&token).map_err(|e| e.to_string())?;
-    let uid = claims.id;
+pub async fn get_jday<C: crate::api::ApiClient>(data_access: &crate::api::DataAccess<'_, C>, date: &str, verbose: bool) -> Result<models::JDay, String> {
+    let uid = data_access.uid.ok_or("No user ID available")?;
+    let client = data_access.client;
 
-    // Check cache
-    if let Some(jday) = lookup_cached_jday(uid, date, verbose) {
-        return Ok(jday);
+    // Check cache if allowed
+    if data_access.use_cache {
+        if let Some(jday) = lookup_cached_jday(uid, date, verbose) {
+            return Ok(jday);
+        }
     }
+
+    if !data_access.use_network {
+        return Err(format!("No workout found for {} (network access disabled)", date));
+    }
+
+    let token = data_access.token.ok_or("No token available for network request")?;
 
     let query = format!(r#"
 query {{
@@ -159,8 +228,10 @@ query {{
 
     if let Some(data) = response.data {
         if let Some(jday) = data.jday {
-            // Cache the plain version, using kg
-            write_cached_jday(uid, date, &jday);
+            // Cache the plain version if allowed
+            if data_access.write_cache {
+                write_cached_jday(uid, date, &jday);
+            }
             // return the jday
             Ok(jday)
         } else {
@@ -171,9 +242,15 @@ query {{
     }
 }
 
-pub async fn get_dates<C: crate::api::ApiClient>(client: &C, token: &str, latest: Option<String>, oldest: Option<String>, count: u32, reverse: bool) -> Result<Vec<String>, String> {
-    let claims = auth::decode_token(&token).map_err(|e| e.to_string())?;
-    let uid = claims.id;
+pub async fn get_dates<C: crate::api::ApiClient>(data_access: &crate::api::DataAccess<'_, C>, latest: Option<String>, oldest: Option<String>, count: u32, reverse: bool) -> Result<Vec<String>, String> {
+    let uid = data_access.uid.ok_or("No user ID available")?;
+    let client = data_access.client;
+
+    if !data_access.use_network {
+        return get_dates_from_cache(uid, latest, oldest, count, reverse);
+    }
+
+    let token = data_access.token.ok_or("No token available for network request")?;
 
     let initial_ymd = latest.clone().unwrap_or_else(|| {
         let today = Utc::now().date_naive();
