@@ -37,6 +37,7 @@ pub fn read_cached_user_wants_kg() -> Option<bool> {
                 None
             } else {
                 let content = fs::read_to_string(&file_path).ok()?;
+//eprintln!("#### RD {:?} -> {}", file_path, content.trim());
                 match content.trim() {
                     "0" => Some(false),
                     "1" => Some(true),
@@ -48,6 +49,7 @@ pub fn read_cached_user_wants_kg() -> Option<bool> {
             }
         };
     }
+//eprintln!("#### RD cache -> {}", guard.unwrap());
     *guard
 }
 
@@ -69,6 +71,7 @@ pub fn write_cached_user_wants_kg(value: bool) {
             let _ = fs::rename(&temp_path, &file_path);
         }
     }
+//eprintln!("#### WR cache <- {}", value);
     *USER_WANTS_KG.lock().unwrap() = Some(value);
 }
 

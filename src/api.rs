@@ -7,6 +7,7 @@ use tokio::sync::OnceCell;
 
 use crate::models::{GraphQLRequest, GraphQLResponse, WorkoutRequest, WorkoutResponse, UserBasicInfoData, User};
 use crate::formatters::STDERR_COLOR_ENABLED;
+use crate::workouts::{write_cached_user_wants_kg, read_cached_user_wants_kg};
 
 #[cfg_attr(tarpaulin, ignore)]
 #[async_trait]
@@ -136,13 +137,16 @@ impl ApiClient for ReqwestClient {
             if let Some(errors) = response.errors {
                 return Err::<User, Box<dyn std::error::Error>>(format!("GraphQL errors: {:?}", errors).into());
             }
+            // Default to kg if not available
             if let Some(data) = response.data {
+                let mut usekg = 1;
                 if let Some(session) = data.get_session {
-                    Ok(session.user)
-                } else {
-                    // Default to kg if not available
-                    Ok(User { usekg: Some(1) })
+                    if let Some(val) = session.user.usekg {
+                        write_cached_user_wants_kg(val != 0);
+                        usekg = val;
+                    }
                 }
+                Ok(User { usekg: Some(usekg) })
             } else {
                 Err("No data in response".into())
             }
@@ -151,6 +155,9 @@ impl ApiClient for ReqwestClient {
     }
 
     async fn user_wants_kg(&self, token: &str) -> bool {
+        if let Some(val) = read_cached_user_wants_kg() {
+            return val;
+        }
         let user = self.get_user_info(token).await;
         match user {
             Ok(ref u) => return u.usekg.unwrap_or(1) == 1,

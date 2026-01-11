@@ -25,9 +25,22 @@ pub fn parse_workout(text: &str) -> Result<JDay, String> {
     if i < lines.len() {
         let line = lines[i];
         if let Some(caps) = BW_REGEX.captures(line.trim()) {
+            let mut lb_to_kg = false;
+            if let Some(unit_match) = caps.get(2) {
+                if unit_match.as_str() == "lbs" {
+                    lb_to_kg = true;
+                }
+            };
             if let Some(num_match) = caps.get(1) {
                 let bw_val: f32 = num_match.as_str().parse().map_err(|_| format!("Line {}: Invalid bw number: {}", i + 1, num_match.as_str()))?;
-                bw = Some(bw_val);
+
+                // jday bw is always in kg
+
+                bw = if lb_to_kg {
+                    Some(bw_val / 2.20462)
+                } else {
+                    Some(bw_val)
+                };
                 i += 1;
             }
         }

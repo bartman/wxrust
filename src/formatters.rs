@@ -5,6 +5,7 @@ use atty;
 
 //use crate::models::{JDay, Set, Exercise, EBlock, User};
 use crate::models::{JDay, Set, Exercise, EBlock};
+use crate::workouts::read_cached_user_wants_kg_or;
 
 #[derive(Clone)]
 pub struct FormatOptions {
@@ -26,7 +27,7 @@ impl FormatOptions {
 
     pub fn for_cache() -> Self {
         Self {
-            user_wants_kg: true,
+            user_wants_kg: read_cached_user_wants_kg_or(true),
             bw_precision: 4,
             color_enabled: false,
             show_unit_name: true,
