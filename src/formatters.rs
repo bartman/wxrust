@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use lazy_static::lazy_static;
 use ansi_term::Colour;
+use crate::parsers::LBS_PER_KG;
 use atty;
 
 //use crate::models::{JDay, Set, Exercise, EBlock, User};
@@ -130,9 +131,9 @@ pub fn format_weight(w: f32, w_in_lbs: bool, options: &FormatOptions) -> String 
     let num = if w_in_lbs && display_in_lbs {
         w
     } else if w_in_lbs && !display_in_lbs {
-        w / 2.20462
+        w / LBS_PER_KG
     } else if !w_in_lbs && display_in_lbs {
-        w * 2.20462
+        w * LBS_PER_KG
     } else {
         w
     };
@@ -337,7 +338,7 @@ fn format_workout_internal(date: &str, jday: &JDay, options: &FormatOptions) -> 
     let mut output = vec![color_date_internal(date, options)];
      if let Some(bw) = jday.bw {
          if bw > 0.0 {
-             let num = if options.user_wants_kg { bw } else { bw * 2.20462 };
+             let num = if options.user_wants_kg { bw } else { bw * LBS_PER_KG };
              let unit_str = if options.user_wants_kg { "kg" } else { "lbs" };
              let bwtxt = if options.show_unit_name {
                  format!("{:.*} {}", options.bw_precision, num, unit_str)

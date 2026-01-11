@@ -2,6 +2,8 @@ use crate::models::{JDay, EBlock, ExerciseWrapper, Exercise, Set};
 use regex::Regex;
 use lazy_static::lazy_static;
 
+pub const LBS_PER_KG: f32 = 2.20462;
+
 lazy_static! {
     static ref BW_REGEX: Regex = Regex::new(r"^@ *([1-9][0-9]*\.?[0-9]*) *(kg|lbs)? *bw$").unwrap();
 }
@@ -37,7 +39,7 @@ pub fn parse_workout(text: &str) -> Result<JDay, String> {
                 // jday bw is always in kg
 
                 bw = if lb_to_kg {
-                    Some(bw_val / 2.20462)
+                    Some(bw_val / LBS_PER_KG)
                 } else {
                     Some(bw_val)
                 };
@@ -330,7 +332,7 @@ pub fn parse_set_line(line: &str) -> Result<Vec<Set>, String> {
     for (w, parsed_lb, usebw) in weights {
         let mut w_in_kg = w;
         if parsed_lb && !store_w_in_lbs {
-            w_in_kg = w / 2.20462
+            w_in_kg = w / LBS_PER_KG
         }
         for &r in &reps {
             result.push(Set {
