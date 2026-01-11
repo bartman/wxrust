@@ -49,8 +49,13 @@ Create a `credentials.txt` file with your WeightXReps account email on the first
 ### Global Options
 
 - `--credentials <file>`: Path to credentials file (optional, falls back to standard locations)
-- `--force-authentication`: Force re-login, ignore cached token
+- `--force-authentication`: Force re-login, ignore cached token (still saves new token to cache)
+- `--no-network`: Skip network access, use cache only (workouts and dates come from local cache)
+- `--no-cache`: Skip cache lookup, fetch all data from server (writes still happen unless `--no-cache-write` is also used)
+- `--no-cache-write`: Disable cache writes (reads still happen unless `--no-cache` is also used)
 - `--color <always|never|auto>`: Control color output (default: auto, based on TTY)
+
+**Note:** `--no-network` and `--no-cache` are mutually exclusive.
 
 ### Commands
 

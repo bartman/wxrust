@@ -1,10 +1,11 @@
 use mockall::mock;
-use wxrust::workouts::{get_jday, get_dates, read_cached_user_wants_kg, read_cached_user_wants_kg_or, write_cached_user_wants_kg, forget_cached_user_wants_kg};
+use wxrust::workouts::{get_jday, get_dates, get_dates_from_cache, read_cached_user_wants_kg, read_cached_user_wants_kg_or, write_cached_user_wants_kg, forget_cached_user_wants_kg};
 use wxrust::models::{GraphQLResponse, WorkoutData, JDay, EBlock, ExerciseWrapper, Exercise, Set, User};
 use base64::{Engine, engine::general_purpose};
 use tempfile::TempDir;
 use lazy_static::lazy_static;
 use tokio::sync::Mutex;
+use std::fs;
 
 // all tests in this file run sequentially to avoid clashing with global cached state;
 // to do this we use an async-aware mutex and hold it in each test,
@@ -455,6 +456,155 @@ async fn test_write_cached_user_wants_kg() {
     write_cached_user_wants_kg(false);
     let content = std::fs::read_to_string(&file_path).unwrap();
     assert_eq!(content, "0\n");
+
+    // Restore original XDG_CACHE_HOME
+    if let Ok(original) = original_xdg_cache {
+        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+    } else {
+        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+    }
+}
+
+#[tokio::test]
+async fn test_get_dates_from_cache_empty_dir() {
+    let _guard = ENV_MUTEX.lock().await;
+    let temp_dir = TempDir::new().unwrap();
+    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
+    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+
+    // No cache directory exists
+    let result = get_dates_from_cache(123, None, None, 10, false);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), Vec::<String>::new());
+
+    // Restore original XDG_CACHE_HOME
+    if let Ok(original) = original_xdg_cache {
+        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+    } else {
+        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+    }
+}
+
+#[tokio::test]
+async fn test_get_dates_from_cache_with_files() {
+    let _guard = ENV_MUTEX.lock().await;
+    let temp_dir = TempDir::new().unwrap();
+    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
+    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+
+    // Create cache directory and files
+    let cache_dir = temp_dir.path().join("wxrust").join("456");
+    fs::create_dir_all(&cache_dir).unwrap();
+    fs::write(cache_dir.join("2025-01-01.txt"), "workout data").unwrap();
+    fs::write(cache_dir.join("2025-01-05.txt"), "workout data").unwrap();
+    fs::write(cache_dir.join("2025-01-10.txt"), "workout data").unwrap();
+    fs::write(cache_dir.join("invalid.txt"), "invalid").unwrap();
+    fs::write(cache_dir.join("2025-01-20.dat"), "wrong extension").unwrap();
+
+    let result = get_dates_from_cache(456, None, None, 0, false);
+    assert!(result.is_ok());
+    let dates = result.unwrap();
+    assert_eq!(dates, vec!["2025-01-01", "2025-01-05", "2025-01-10"]);
+
+    // Restore original XDG_CACHE_HOME
+    if let Ok(original) = original_xdg_cache {
+        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+    } else {
+        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+    }
+}
+
+#[tokio::test]
+async fn test_get_dates_from_cache_with_filters() {
+    let _guard = ENV_MUTEX.lock().await;
+    let temp_dir = TempDir::new().unwrap();
+    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
+    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+
+    // Create cache directory and files
+    let cache_dir = temp_dir.path().join("wxrust").join("789");
+    fs::create_dir_all(&cache_dir).unwrap();
+    fs::write(cache_dir.join("2025-01-01.txt"), "workout data").unwrap();
+    fs::write(cache_dir.join("2025-01-05.txt"), "workout data").unwrap();
+    fs::write(cache_dir.join("2025-01-10.txt"), "workout data").unwrap();
+    fs::write(cache_dir.join("2025-01-15.txt"), "workout data").unwrap();
+    fs::write(cache_dir.join("2025-01-20.txt"), "workout data").unwrap();
+
+    // Test with oldest filter
+    let result = get_dates_from_cache(789, None, Some("2025-01-10".to_string()), 0, false);
+    assert!(result.is_ok());
+    let dates = result.unwrap();
+    assert_eq!(dates, vec!["2025-01-10", "2025-01-15", "2025-01-20"]);
+
+    // Test with latest filter
+    let result = get_dates_from_cache(789, Some("2025-01-10".to_string()), None, 0, false);
+    assert!(result.is_ok());
+    let dates = result.unwrap();
+    assert_eq!(dates, vec!["2025-01-01", "2025-01-05", "2025-01-10"]);
+
+    // Test with both filters
+    let result = get_dates_from_cache(789, Some("2025-01-15".to_string()), Some("2025-01-05".to_string()), 0, false);
+    assert!(result.is_ok());
+    let dates = result.unwrap();
+    assert_eq!(dates, vec!["2025-01-05", "2025-01-10", "2025-01-15"]);
+
+    // Restore original XDG_CACHE_HOME
+    if let Ok(original) = original_xdg_cache {
+        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+    } else {
+        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+    }
+}
+
+#[tokio::test]
+async fn test_get_dates_from_cache_with_count() {
+    let _guard = ENV_MUTEX.lock().await;
+    let temp_dir = TempDir::new().unwrap();
+    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
+    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+
+    // Create cache directory and files
+    let cache_dir = temp_dir.path().join("wxrust").join("999");
+    fs::create_dir_all(&cache_dir).unwrap();
+    fs::write(cache_dir.join("2025-01-01.txt"), "workout data").unwrap();
+    fs::write(cache_dir.join("2025-01-05.txt"), "workout data").unwrap();
+    fs::write(cache_dir.join("2025-01-10.txt"), "workout data").unwrap();
+    fs::write(cache_dir.join("2025-01-15.txt"), "workout data").unwrap();
+    fs::write(cache_dir.join("2025-01-20.txt"), "workout data").unwrap();
+
+    // Test with count limit
+    let result = get_dates_from_cache(999, None, None, 3, false);
+    assert!(result.is_ok());
+    let dates = result.unwrap();
+    assert_eq!(dates, vec!["2025-01-10", "2025-01-15", "2025-01-20"]);
+
+    // Restore original XDG_CACHE_HOME
+    if let Ok(original) = original_xdg_cache {
+        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+    } else {
+        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+    }
+}
+
+#[tokio::test]
+async fn test_get_dates_from_cache_with_reverse() {
+    let _guard = ENV_MUTEX.lock().await;
+    let temp_dir = TempDir::new().unwrap();
+    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
+    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+
+    // Create cache directory and files
+    let cache_dir = temp_dir.path().join("wxrust").join("111");
+    fs::create_dir_all(&cache_dir).unwrap();
+    fs::write(cache_dir.join("2025-01-01.txt"), "workout data").unwrap();
+    fs::write(cache_dir.join("2025-01-05.txt"), "workout data").unwrap();
+    fs::write(cache_dir.join("2025-01-10.txt"), "workout data").unwrap();
+
+    // Test with reverse
+    let result = get_dates_from_cache(111, None, None, 0, true);
+    assert!(result.is_ok());
+    let dates = result.unwrap();
+    assert_eq!(dates, vec!["2025-01-10", "2025-01-05", "2025-01-01"]);
 
     // Restore original XDG_CACHE_HOME
     if let Ok(original) = original_xdg_cache {
