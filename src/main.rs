@@ -252,17 +252,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 for (seq, date) in dates_to_use.iter().enumerate() {
                     let date = date.clone();
                     let client_clone = client.clone();
-                    let data_access_clone = crate::api::DataAccess {
-                        client: &client_clone,
-                        token: token.as_deref(),
-                        uid: data_access.uid,
-                        use_network: data_access.use_network,
-                        use_cache: data_access.use_cache,
-                        write_cache: data_access.write_cache,
-                    };
+                    let token_clone = token.clone();
+                    let verbose = args.verbose;
+                    let use_network = data_access.use_network;
+                    let use_cache = data_access.use_cache;
+                    let write_cache = data_access.write_cache;
+                    let uid = data_access.uid;
                     let tx_clone = tx.clone();
                     tokio::spawn(async move {
-                        let result = match workouts::get_jday(&data_access_clone, &date, args.verbose).await {
+                        let data_access_clone = crate::api::DataAccess {
+                            client: &client_clone,
+                            token: token_clone.as_deref(),
+                            uid,
+                            use_network,
+                            use_cache,
+                            write_cache,
+                        };
+                        let result = match workouts::get_jday(&data_access_clone, &date, verbose).await {
                             Ok(jday) => Some(jday),
                             Err(e) => {
                                 eprintln!("Error getting workout for {}: {}", date, e);
