@@ -11,6 +11,9 @@ Commands:
 Options:
   -c, --credentials <CREDENTIALS>  
   -a, --force-authentication       
+      --no-network                 
+      --no-cache                   
+      --no-cache-write             
       --color <COLOR>              [default: auto]
   -v, --verbose                    
   -h, --help                       Print help
