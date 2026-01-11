@@ -2,6 +2,7 @@ use wxrust::parsers::*;
 use wxrust::formatters::*;
 use wxrust::models::{JDay, Set, Exercise, ExerciseWrapper, EBlock};
 use wxrust::workouts::{forget_cached_user_wants_kg, write_cached_user_wants_kg};
+use wxrust::parsers::LBS_PER_KG;
 
 #[test]
 fn test_parse_workout_simple() {
@@ -58,16 +59,19 @@ fn test_round_trip() {
     let log = "cutting, fasted\nEBLOCK:lat-pulldown\nEBLOCK:cable-low-row\n";
     let original_jday = JDay {
         log: log.to_string(),
-        bw: Some(215.0),
+        bw: Some(102.9656), // 227.0000 lbs is 102.9656 kg
         eblocks: vec![eblock1, eblock2],
         exercises: vec![ex_wrapper1, ex_wrapper2],
     };
+
+    // in this test our input and output is lbs
+    forget_cached_user_wants_kg();
+    write_cached_user_wants_kg(false);
 
     // Format to full text (simulate render_workout without color)
     unsafe { std::env::set_var("WXRUST_COLOR", "never"); }
     let _user = wxrust::models::User { usekg: Some(1) };
     let full_formatted_text = format_workout_for_cache("2025-01-21", &original_jday);
-
 
     // Parse back
     let parsed_jday = parse_workout(&full_formatted_text).unwrap();
@@ -150,14 +154,14 @@ TM: 485
     assert_eq!(parsed_jday.eblocks[0].sets.len(), 7); // 195x10, 245x5, 295x3, 375x5, 425x3, 472x7, 375x5
 
     // Check some sets
-    assert_eq!(parsed_jday.eblocks[0].sets[0].w, Some(195.0));
+    assert_eq!(parsed_jday.eblocks[0].sets[0].w, Some(195.0/LBS_PER_KG));
     assert_eq!(parsed_jday.eblocks[0].sets[0].r, Some(10));
     assert_eq!(parsed_jday.eblocks[0].sets[0].s, Some(1));
-    assert_eq!(parsed_jday.eblocks[0].sets[5].w, Some(472.0));
+    assert_eq!(parsed_jday.eblocks[0].sets[5].w, Some(472.0/LBS_PER_KG));
     assert_eq!(parsed_jday.eblocks[0].sets[5].r, Some(7));
     assert_eq!(parsed_jday.eblocks[0].sets[5].s, Some(1));
     assert_eq!(parsed_jday.eblocks[0].sets[5].c, Some("hard, but rewarding".to_string()));
-    assert_eq!(parsed_jday.eblocks[0].sets[6].w, Some(375.0));
+    assert_eq!(parsed_jday.eblocks[0].sets[6].w, Some(375.0/LBS_PER_KG));
     assert_eq!(parsed_jday.eblocks[0].sets[6].r, Some(5));
     assert_eq!(parsed_jday.eblocks[0].sets[6].s, Some(1));
     assert_eq!(parsed_jday.eblocks[0].sets[6].c, Some("AMRAP".to_string()));
@@ -205,12 +209,12 @@ shoulders need more work
     assert_eq!(parsed_jday.eblocks[2].sets.len(), 1); // 25x10x3
 
     // Check some sets
-    assert_eq!(parsed_jday.eblocks[0].sets[0].w, Some(70.0));
+    assert_eq!(parsed_jday.eblocks[0].sets[0].w, Some(70.0/LBS_PER_KG));
     assert_eq!(parsed_jday.eblocks[0].sets[0].r, Some(10));
     assert_eq!(parsed_jday.eblocks[0].sets[6].c, Some("AMRAP".to_string()));
-    assert_eq!(parsed_jday.eblocks[1].sets[0].w, Some(5.0));
+    assert_eq!(parsed_jday.eblocks[1].sets[0].w, Some(5.0/LBS_PER_KG));
     assert_eq!(parsed_jday.eblocks[1].sets[0].r, Some(10));
-    assert_eq!(parsed_jday.eblocks[2].sets[0].w, Some(25.0));
+    assert_eq!(parsed_jday.eblocks[2].sets[0].w, Some(25.0/LBS_PER_KG));
     assert_eq!(parsed_jday.eblocks[2].sets[0].r, Some(10));
     assert_eq!(parsed_jday.eblocks[2].sets[0].s, Some(3));
 
@@ -334,10 +338,10 @@ TM: 465
     assert_eq!(parsed_jday.eblocks[0].sets.len(), 8); // 135x10, 235x5, 285x3, 350x5, 405x3, 445x1, 445x3, 350x5
 
     // Check the compressed reps sets
-    assert_eq!(parsed_jday.eblocks[0].sets[5].w, Some(445.0));
+    assert_eq!(parsed_jday.eblocks[0].sets[5].w, Some(445.0/LBS_PER_KG));
     assert_eq!(parsed_jday.eblocks[0].sets[5].r, Some(1));
     assert_eq!(parsed_jday.eblocks[0].sets[5].s, Some(1));
-    assert_eq!(parsed_jday.eblocks[0].sets[6].w, Some(445.0));
+    assert_eq!(parsed_jday.eblocks[0].sets[6].w, Some(445.0/LBS_PER_KG));
     assert_eq!(parsed_jday.eblocks[0].sets[6].r, Some(3));
     assert_eq!(parsed_jday.eblocks[0].sets[6].s, Some(1));
     assert_eq!(parsed_jday.eblocks[0].sets[7].c, Some("AMRAP".to_string()));
@@ -391,8 +395,8 @@ fn test_parse_units() {
     // Test units
     let sets = parse_set_line("405 lb x 5").unwrap();
     assert_eq!(sets.len(), 1);
-    assert_eq!(sets[0].w, Some(405.0));
-    assert_eq!(sets[0].lb, Some(1.0));
+    assert_eq!(sets[0].w, Some(405.0/LBS_PER_KG)); // w is always in kg
+    assert_eq!(sets[0].lb, Some(1.0));             // lb==1 if user entered it in lbs
 
     let sets = parse_set_line("180 kg x 5").unwrap();
     assert_eq!(sets.len(), 1);
