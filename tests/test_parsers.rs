@@ -4,6 +4,10 @@ use wxrust::models::{JDay, Set, Exercise, ExerciseWrapper, EBlock};
 use wxrust::workouts::{forget_cached_user_wants_kg, write_cached_user_wants_kg};
 use wxrust::parsers::LBS_PER_KG;
 
+fn roughly_equal(a: f32, b: f32, tolerance: f32) -> bool {
+    (a - b).abs() < tolerance
+}
+
 #[test]
 fn test_parse_workout_simple() {
     let text = "2025-01-21
@@ -550,11 +554,22 @@ fn test_parser_options_lbs() {
     let jday = parse_workout_with_options(text, &options).unwrap();
     
     // Body weight explicitly marked as lbs, so it converts to kg
-    assert_eq!(jday.bw, Some(220.0 / LBS_PER_KG));
+    let expected_bw_kg = 220.0 / LBS_PER_KG;
+    assert!(
+        roughly_equal(jday.bw.unwrap(), expected_bw_kg, 0.01),
+        "Body weight should be converted from lbs to kg, got {} expected {}",
+        jday.bw.unwrap(),
+        expected_bw_kg
+    );
     
     // Weight without explicit unit, should be interpreted as lbs and converted to kg
     let expected_weight_kg = 440.0 / LBS_PER_KG;
-    assert!((jday.eblocks[0].sets[0].w.unwrap() - expected_weight_kg).abs() < 0.01);
+    assert!(
+        roughly_equal(jday.eblocks[0].sets[0].w.unwrap(), expected_weight_kg, 0.01),
+        "Weight should be interpreted as lbs and converted to kg, got {} expected {}",
+        jday.eblocks[0].sets[0].w.unwrap(),
+        expected_weight_kg
+    );
 }
 
 #[test]
@@ -587,6 +602,8 @@ fn test_parser_options_round_trip_lbs() {
     // Format for cache (will use lbs since user wants lbs)
     let cache_text = format_workout_for_cache("2025-01-21", &jday);
     
+    eprintln!("Cache text:\n{}", cache_text);
+    
     // The cache should show weights in lbs
     assert!(cache_text.contains("220")); // 100kg * 2.20462 ≈ 220 lbs bodyweight
     assert!(cache_text.contains("lbs bw"));
@@ -595,12 +612,26 @@ fn test_parser_options_round_trip_lbs() {
     let options = ParserOptions::new(false); // user wants lbs
     let parsed = parse_workout_with_options(&cache_text, &options).unwrap();
     
-    // The parsed weight should be back to ~100kg
-    let weight_diff = (parsed.eblocks[0].sets[0].w.unwrap() - 100.0).abs();
-    assert!(weight_diff < 0.1, "Weight should round-trip correctly, diff: {}", weight_diff);
+    eprintln!("Original weight (kg): {}", 100.0);
+    eprintln!("Parsed weight (kg): {}", parsed.eblocks[0].sets[0].w.unwrap());
     
-    let bw_diff = (parsed.bw.unwrap() - 100.0).abs();
-    assert!(bw_diff < 0.1, "Body weight should round-trip correctly, diff: {}", bw_diff);
+    // The parsed weight should be back to ~100kg
+    // Note: There will be rounding error because format_workout_for_cache formats weights as
+    // integer lbs (220 lbs), so 100kg → 220.462 lbs → 220 lbs → 99.79kg
+    assert!(
+        roughly_equal(parsed.eblocks[0].sets[0].w.unwrap(), 100.0, 0.5),
+        "Weight should round-trip correctly (within rounding error), got {} expected {}",
+        parsed.eblocks[0].sets[0].w.unwrap(),
+        100.0
+    );
+    
+    // Body weight has more precision (4 decimal places), so it should be closer
+    assert!(
+        roughly_equal(parsed.bw.unwrap(), 100.0, 0.01),
+        "Body weight should round-trip correctly, got {} expected {}",
+        parsed.bw.unwrap(),
+        100.0
+    );
     
     // Cleanup
     forget_cached_user_wants_kg();

@@ -374,7 +374,7 @@ pub fn parse_set_line_with_options(line: &str, options: &ParserOptions) -> Resul
     }
     // Determine lb if any weights have lbs units
     // When user_wants_kg is false, weights without explicit units are in lbs
-    let store_w_in_lbs = !options.user_wants_kg;
+    let weights_without_unit_are_lbs = !options.user_wants_kg;
     let mut show_lb = 0.0;
     for (_, parsed_lb, _) in &weights {
         if *parsed_lb {
@@ -384,15 +384,14 @@ pub fn parse_set_line_with_options(line: &str, options: &ParserOptions) -> Resul
     // Now create the sets
     let mut result = Vec::new();
     for (w, parsed_lb, usebw) in weights {
-        let mut w_in_kg = w;
-        // Convert to kg if needed:
-        // - If weight has explicit "lbs" unit, convert from lbs to kg
-        // - If weight has no explicit unit but user wants lbs (store_w_in_lbs=true), convert from lbs to kg
-        if parsed_lb && !store_w_in_lbs {
-            w_in_kg = w / LBS_PER_KG
-        } else if !parsed_lb && store_w_in_lbs {
-            w_in_kg = w / LBS_PER_KG
-        }
+        // Internal storage is always in kg. Convert to kg if:
+        // - Weight has explicit "lbs" unit (parsed_lb=true), OR
+        // - Weight has no explicit unit (parsed_lb=false) AND user stores weights in lbs
+        let w_in_kg = if parsed_lb || weights_without_unit_are_lbs {
+            w / LBS_PER_KG
+        } else {
+            w
+        };
         for &r in &reps {
             result.push(Set {
                 w: Some(w_in_kg),
