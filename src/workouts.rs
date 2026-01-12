@@ -30,7 +30,7 @@ fn limit_and_sort_dates(mut dates: Vec<String>, count: u32, reverse: bool) -> Ve
     dates
 }
 
-fn get_cache_base_dir() -> Result<PathBuf, String> {
+pub fn get_cache_base_dir() -> Result<PathBuf, String> {
     let cache_dir = if let Ok(dir) = std::env::var("XDG_CACHE_HOME") {
         if !dir.is_empty() {
             PathBuf::from(dir)

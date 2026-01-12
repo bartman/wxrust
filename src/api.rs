@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use reqwest::Client;
 use serde::de::DeserializeOwned;
 use serde_json;
 use ansi_term::Colour;
@@ -63,7 +62,7 @@ pub struct DataAccess<'a, C: ApiClient> {
 
 #[derive(Clone)]
 pub struct ReqwestClient {
-    client: Client,
+    client: reqwest::Client,
     verbose: bool,
     user_info: OnceCell<crate::models::User>,
 }
@@ -71,7 +70,7 @@ pub struct ReqwestClient {
 impl ReqwestClient {
     pub fn new_with_verbose(verbose: bool) -> Self {
         ReqwestClient {
-            client: Client::new(),
+            client: reqwest::Client::new(),
             verbose,
             user_info: OnceCell::new(),
         }
@@ -171,7 +170,7 @@ pub async fn graphql_request<T: DeserializeOwned + 'static, C: ApiClient>(client
 
 #[cfg_attr(tarpaulin, ignore)]
 #[allow(dead_code)]
-pub async fn workout_request(client: &Client, token: &str, request: &WorkoutRequest) -> Result<WorkoutResponse, Box<dyn std::error::Error>> {
+pub async fn workout_request(client: &reqwest::Client, token: &str, request: &WorkoutRequest) -> Result<WorkoutResponse, Box<dyn std::error::Error>> {
     let response = client
         .post("https://weightxreps.net/api/graphql")
         .header("Authorization", format!("Bearer {}", token))

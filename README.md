@@ -7,6 +7,7 @@ A Rust CLI tool to extract and display workouts from the WeightXReps.net website
 ## Features
 
 - Authenticates using email and password from `credentials.txt` (email first line, password second)
+- Authenticates and caches JWT token in `$XDG_CACHE_HOME/wxrust/token` (or `~/.cache/wxrust/token`)
 - Retrieves individual workouts or lists of workout dates
 - Formats output with colors matching the website editor
 - Supports detailed views, summaries, and date filtering

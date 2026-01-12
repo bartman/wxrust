@@ -145,12 +145,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     unsafe { std::env::set_var("WXRUST_COLOR", &args.color); }
 
-    let token_path = if let Some(config_dir) = dirs::config_dir() {
-        config_dir.join("wxrust").join("token").to_string_lossy().to_string()
-    } else {
-        // Fallback
-        let home = std::env::var("HOME").unwrap_or(".".to_string());
-        format!("{}/.config/wxrust/token", home)
+    let token_path = match workouts::get_cache_base_dir() {
+        Ok(dir) => dir.join("token").to_string_lossy().to_string(),
+        Err(_) => {
+            let home = std::env::var("HOME").unwrap_or(".".to_string());
+            format!("{}/.cache/wxrust/token", home)
+        }
     };
 
     // Set credentials path if provided
