@@ -75,6 +75,7 @@ You can look in `weightxreps-client/src/data/generated---db-types-and-hooks.tsx`
 - Side-by-side diff display using similar crate for comparing local and server workouts
 - Parsing and formatting support for RPE (@ syntax), BW exercises (BW, BW+, BW-), lb/kg units
 - Optional body weight line in workout parsing; workouts without "@ <number> bw" are allowed and set bw to None
+- Robust workout parsing that treats invalid exercise blocks (lone # or #exercise with no valid sets) as comments
 - Data access control options: `--force-authentication`, `--no-network`, `--no-cache`, `--no-cache-write` for flexible offline/online operation modes
 
 ## Dependencies Added
@@ -160,7 +161,7 @@ Recent refactoring extracted common code into helper functions to improve mainta
 - **Error Handling**: `exit_with_error` in utils.rs centralizes error logging and exit, replacing repeated `eprintln!` and `std::process::exit(1)` patterns.
 - **API Logging**: `log_verbose_request` and `log_verbose_response` in api.rs extract verbose logging logic for GraphQL requests and responses.
 - **Date Filtering**: `filter_dates_by_range` and `limit_and_sort_dates` in workouts.rs handle date filtering and limiting, used in `get_dates_from_cache` and `get_dates`.
-- **Parsing Helpers**: `parse_bw_line` in parsers.rs extracts bodyweight parsing from `parse_workout`.
+- **Parsing Helpers**: `parse_bw_line` in parsers.rs extracts bodyweight parsing from `parse_workout`. Enhanced `parse_workout` to treat invalid exercise blocks (lone # or #exercise with no valid sets following) as comments rather than creating empty exercises.
 - **Common Helpers**:
   - `workouts::resolve_user_wants_kg`: Consolidates logic for determining user weight unit preference, checking network token then falling back to cache.
   - `workouts::get_dates_from_ranges`: Unified logic for parsing date ranges and fetching/calculating dates, used by both `list` and `fetch` commands.

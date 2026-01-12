@@ -356,6 +356,40 @@ TM: 465
 }
 
 #[test]
+fn test_parse_2025_04_28() {
+    let cache_text = r#"2025-04-28
+@ 213 bw
+531 squat C18 W2
+TM: 415
+#
+#safety-squat #sq
+135 x 10
+185, 225 x 5
+285, 335, 375 x 3
+"#.to_string() + "\n";
+
+    // Parse the cache text
+    let parsed_jday = parse_workout(&cache_text).unwrap();
+
+    // The parsed JDay should have the correct structure
+    assert_eq!(parsed_jday.bw, Some(213.0));
+    assert_eq!(parsed_jday.exercises.len(), 1);
+    assert_eq!(parsed_jday.exercises[0].exercise.name, "safety-squat #sq");
+    assert_eq!(parsed_jday.eblocks.len(), 1);
+    assert_eq!(parsed_jday.eblocks[0].eid, "safety-squat #sq");
+    assert_eq!(parsed_jday.eblocks[0].sets.len(), 6); // 135x10, 185x5, 225x5, 285x3, 335x3, 375x3
+
+    // Check some sets
+    assert_eq!(parsed_jday.eblocks[0].sets[0].w, Some(135.0));
+    assert_eq!(parsed_jday.eblocks[0].sets[0].r, Some(10));
+    assert_eq!(parsed_jday.eblocks[0].sets[0].s, Some(1));
+    assert_eq!(parsed_jday.eblocks[0].sets[1].w, Some(185.0));
+    assert_eq!(parsed_jday.eblocks[0].sets[1].r, Some(5));
+    assert_eq!(parsed_jday.eblocks[0].sets[5].w, Some(375.0));
+    assert_eq!(parsed_jday.eblocks[0].sets[5].r, Some(3));
+}
+
+#[test]
 fn test_parse_rpe() {
     // Test RPE parsing
     let sets = parse_set_line("405 x 5 @8").unwrap();

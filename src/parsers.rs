@@ -77,6 +77,13 @@ pub fn parse_workout(text: &str) -> Result<JDay, String> {
             let name = line[1..].trim().to_string();
             let eid = name.clone();
 
+            if name.is_empty() {
+                // Lone #, treat as comment
+                log_lines.push(line.to_string());
+                i += 1;
+                continue;
+            }
+
             exercises.push(ExerciseWrapper {
                 exercise: Exercise {
                     id: eid.clone(),
@@ -90,6 +97,7 @@ pub fn parse_workout(text: &str) -> Result<JDay, String> {
             // Parse sets
             i += 1;
             let mut sets = Vec::new();
+            let mut failed_lines = Vec::new();
             while i < lines.len() && !lines[i].starts_with('#') && !lines[i].starts_with("//") && !lines[i].trim().is_empty() {
                 let line = lines[i];
                 let set_line = line.trim();
@@ -98,17 +106,28 @@ pub fn parse_workout(text: &str) -> Result<JDay, String> {
                         sets.extend(set);
                     }
                     Err(_e) => {
-                        // Not a set line, add to log
-                        log_lines.push(line.to_string());
+                        // Not a set line, collect for later
+                        failed_lines.push(line.to_string());
                     }
                 }
                 i += 1;
             }
 
-            eblocks.push(EBlock {
-                eid,
-                sets,
-            });
+            if sets.is_empty() {
+                // No valid sets, treat the # line and failed lines as comments
+                log_lines.pop(); // remove the EBLOCK line
+                log_lines.push(line.to_string());
+                log_lines.extend(failed_lines);
+                // Don't add the exercise and eblock
+                exercises.pop(); // remove the added exercise
+            } else {
+                // Valid sets found, add failed lines to log
+                log_lines.extend(failed_lines);
+                eblocks.push(EBlock {
+                    eid,
+                    sets,
+                });
+            }
         } else {
             log_lines.push(line.to_string());
             i += 1;
