@@ -328,3 +328,35 @@ query GetJRange($uid: ID!, $ymd: YMD!, $range: Int!) {
     let result = limit_and_sort_dates(all_dates, count, reverse);
     Ok(result)
 }
+
+pub async fn resolve_user_wants_kg<C: crate::api::ApiClient>(
+    data_access: &crate::api::DataAccess<'_, C>,
+) -> bool {
+    if let Some(token) = data_access.token {
+        data_access.client.user_wants_kg(token).await
+    } else {
+        read_cached_user_wants_kg_or(true)
+    }
+}
+
+pub async fn get_dates_from_ranges<C: crate::api::ApiClient>(
+    data_access: &crate::api::DataAccess<'_, C>,
+    ranges: &[String],
+) -> Result<Vec<String>, String> {
+    let mut all_dates: Vec<String> = vec![];
+    for range_str in ranges {
+        let (oldest, latest) = match crate::utils::parse_date_range(range_str) {
+            Ok(start_end) => start_end,
+            Err(e) => return Err(format!("Invalid date range '{}': {}", range_str, e)),
+        };
+        let count = ((oldest - latest).num_days().abs() + 1) as u32;
+        let dates = match get_dates(data_access, Some(latest.to_string()), Some(oldest.to_string()), count, false).await {
+            Ok(d) => d,
+            Err(e) => return Err(e),
+        };
+        all_dates.extend(dates);
+    }
+    all_dates.sort();
+    all_dates.dedup();
+    Ok(all_dates)
+}

@@ -207,22 +207,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Err(e) => utils::exit_with_error(e),
                 }
             } else {
-                // Parse ranges
-                let mut all_dates: Vec<String> = vec![];
-                for range_str in &list.dates {
-                    let (oldest, latest) = match utils::parse_date_range(range_str) {
-                        Ok(start_end) => start_end,
-                        Err(e) => utils::exit_with_error(format!("Invalid date range '{}': {}", range_str, e)),
-                    };
-                    let count = ((oldest - latest).num_days().abs() + 1) as u32;
-                    let dates = match workouts::get_dates(&data_access,
-                                        Some(latest.to_string()), Some(oldest.to_string()), count, false).await {
-                        Ok(d) => d,
+                let mut all_dates = match workouts::get_dates_from_ranges(&data_access, &list.dates).await {
+                    Ok(d) => d,
                     Err(e) => utils::exit_with_error(e),
-                    };
-                    all_dates.extend(dates);
-                }
-                all_dates.sort();
+                };
                 if list.reverse {
                     all_dates.reverse();
                 }
@@ -234,12 +222,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             if list.details || list.summary {
-                let user_wants_kg = if let Some(token_ref) = &token {
-                    data_access.client.user_wants_kg(token_ref).await
-                } else {
-                    // No network mode: use cached preference
-                    crate::workouts::read_cached_user_wants_kg_or(true)
-                };
+                let user_wants_kg = workouts::resolve_user_wants_kg(&data_access).await;
                 let (tx, mut rx) = tokio::sync::mpsc::channel(32);
                 for (seq, date) in dates_to_use.iter().enumerate() {
                     let date = date.clone();
@@ -340,12 +323,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let summary = formatters::summarize_workout(&jday);
                 println!("{} {}", fmt_date, summary);
             } else {
-                let user_wants_kg = if let Some(token_ref) = &token {
-                    data_access.client.user_wants_kg(token_ref).await
-                } else {
-                    // No network mode: use cached preference
-                    crate::workouts::read_cached_user_wants_kg_or(true)
-                };
+                let user_wants_kg = workouts::resolve_user_wants_kg(&data_access).await;
                 let workout = formatters::format_workout(&date, &jday, user_wants_kg);
                 print!("{}", workout);
                 if !workout.ends_with('\n') {

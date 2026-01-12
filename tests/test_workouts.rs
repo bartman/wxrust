@@ -613,3 +613,104 @@ async fn test_get_dates_from_cache_with_reverse() {
         unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
     }
 }
+
+#[tokio::test]
+async fn test_resolve_user_wants_kg_with_token() {
+    let _guard = ENV_MUTEX.lock().await;
+    let mut mock_client = MockApiClient::new();
+    mock_client
+        .expect_user_wants_kg()
+        .with(mockall::predicate::eq("token"))
+        .times(1)
+        .returning(|_| true);
+
+    let data_access = wxrust::api::DataAccess {
+        client: &mock_client,
+        token: Some("token"),
+        uid: Some(123),
+        use_network: true,
+        use_cache: true,
+        write_cache: true,
+    };
+
+    let result = wxrust::workouts::resolve_user_wants_kg(&data_access).await;
+    assert_eq!(result, true);
+}
+
+#[tokio::test]
+async fn test_resolve_user_wants_kg_without_token() {
+    let _guard = ENV_MUTEX.lock().await;
+    let temp_dir = TempDir::new().unwrap();
+    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
+    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+
+    forget_cached_user_wants_kg();
+    
+    // Set cache to false
+    let wxrust_dir = temp_dir.path().join("wxrust");
+    std::fs::create_dir_all(&wxrust_dir).unwrap();
+    std::fs::write(wxrust_dir.join("user_wants_kg"), "0\n").unwrap();
+
+    let mut mock_client = MockApiClient::new();
+    mock_client.expect_user_wants_kg().times(0);
+
+    let data_access = wxrust::api::DataAccess {
+        client: &mock_client,
+        token: None,
+        uid: Some(123),
+        use_network: false,
+        use_cache: true,
+        write_cache: false,
+    };
+
+    let result = wxrust::workouts::resolve_user_wants_kg(&data_access).await;
+    assert_eq!(result, false);
+
+    // Restore original XDG_CACHE_HOME
+    if let Ok(original) = original_xdg_cache {
+        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+    } else {
+        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+    }
+}
+
+#[tokio::test]
+async fn test_get_dates_from_ranges() {
+    let _guard = ENV_MUTEX.lock().await;
+    let temp_dir = TempDir::new().unwrap();
+    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
+    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+
+    // Setup cache
+    let cache_dir = temp_dir.path().join("wxrust").join("123");
+    fs::create_dir_all(&cache_dir).unwrap();
+    fs::write(cache_dir.join("2023-10-01.txt"), "").unwrap();
+    fs::write(cache_dir.join("2023-10-02.txt"), "").unwrap();
+    fs::write(cache_dir.join("2023-10-05.txt"), "").unwrap();
+
+    let mock_client = MockApiClient::new();
+    // No network calls expected as we use cache
+
+    let data_access = wxrust::api::DataAccess {
+        client: &mock_client,
+        token: None,
+        uid: Some(123),
+        use_network: false, // Force cache usage
+        use_cache: true,
+        write_cache: false,
+    };
+
+    let ranges = vec!["2023-10-01..2023-10-02".to_string(), "2023-10-05".to_string()];
+    let result = wxrust::workouts::get_dates_from_ranges(&data_access, &ranges).await;
+
+    assert!(result.is_ok());
+    let dates = result.unwrap();
+    assert_eq!(dates, vec!["2023-10-01", "2023-10-02", "2023-10-05"]);
+
+    // Restore original XDG_CACHE_HOME
+    if let Ok(original) = original_xdg_cache {
+        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+    } else {
+        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+    }
+}

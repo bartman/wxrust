@@ -93,3 +93,14 @@ pub fn parse_date_boundary(s: &str, end: bool) -> Result<NaiveDate, String> {
     NaiveDate::from_ymd_opt(year, month, day)
         .ok_or_else(|| "Invalid date".to_string())
 }
+
+pub fn create_progress_bar(len: u64) -> indicatif::ProgressBar {
+    let pb = indicatif::ProgressBar::new(len);
+    pb.set_style(
+        indicatif::ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} ({eta}) {msg}")
+            .unwrap()
+            .progress_chars("#>-"),
+    );
+    pb
+}

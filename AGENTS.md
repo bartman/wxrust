@@ -152,6 +152,22 @@ Commands support `{{VARIABLE}}` placeholders. Predefined variables include `PROJ
 - Run specific test: `python3 smoke.py --test 000-help`
 - Run all with verbose log: `python3 smoke.py --output smoke.log`
 
+## Code Refactoring
+
+Recent refactoring extracted common code into helper functions to improve maintainability:
+
+- **Authentication Setup**: `setup_auth_and_data_access` in main.rs consolidates login, token decoding, and DataAccess creation, reducing ~100 lines of duplication across List, Show, and Fetch commands.
+- **Error Handling**: `exit_with_error` in utils.rs centralizes error logging and exit, replacing repeated `eprintln!` and `std::process::exit(1)` patterns.
+- **API Logging**: `log_verbose_request` and `log_verbose_response` in api.rs extract verbose logging logic for GraphQL requests and responses.
+- **Date Filtering**: `filter_dates_by_range` and `limit_and_sort_dates` in workouts.rs handle date filtering and limiting, used in `get_dates_from_cache` and `get_dates`.
+- **Parsing Helpers**: `parse_bw_line` in parsers.rs extracts bodyweight parsing from `parse_workout`.
+- **Common Helpers**:
+  - `workouts::resolve_user_wants_kg`: Consolidates logic for determining user weight unit preference, checking network token then falling back to cache.
+  - `workouts::get_dates_from_ranges`: Unified logic for parsing date ranges and fetching/calculating dates, used by both `list` and `fetch` commands.
+  - `utils::create_progress_bar`: Standardized progress bar creation using `indicatif`.
+
+These changes follow the project's guidelines for splitting functionality into helpers and writing unit tests.
+
 ## Future Improvements
 
 - Add support for year/month range queries.

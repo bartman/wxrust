@@ -1,10 +1,9 @@
-use crate::api::{ReqwestClient, ApiClient};
+use crate::api::ReqwestClient;
 use crate::formatters;
 use crate::models;
 use crate::parsers;
 use crate::utils;
 use crate::workouts;
-use indicatif::{ProgressBar, ProgressStyle};
 use regex::Regex;
 use std::fs;
 
@@ -29,13 +28,7 @@ pub async fn fetch_command(
         return Ok(());
     }
 
-    let pb = ProgressBar::new(dates_to_fetch.len() as u64);
-    pb.set_style(
-        ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} ({eta}) {msg}")
-            .unwrap()
-            .progress_chars("#>-"),
-    );
+    let pb = utils::create_progress_bar(dates_to_fetch.len() as u64);
 
     for date in &dates_to_fetch {
         pb.set_message(format!("Fetching {}", date));
@@ -48,8 +41,7 @@ pub async fn fetch_command(
                 show_diff(date, &local, &server_jday);
             } else {
                 println!("{}: No local cache, server version:", date);
-                let token = data_access.token.ok_or("No token available for user preferences")?;
-                let user_wants_kg = data_access.client.user_wants_kg(token).await;
+                let user_wants_kg = workouts::resolve_user_wants_kg(data_access).await;
                 let workout = formatters::format_workout(date, &server_jday, user_wants_kg);
                 print!("{}", workout);
             }
@@ -75,13 +67,7 @@ fn fetch_from_file(uid: u32, file_path: &str, _verbose: bool) -> Result<(), Stri
 
     let workouts = parse_file_export(&content)?;
 
-    let pb = ProgressBar::new(workouts.len() as u64);
-    pb.set_style(
-        ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} ({eta}) {msg}")
-            .unwrap()
-            .progress_chars("#>-"),
-    );
+    let pb = utils::create_progress_bar(workouts.len() as u64);
 
     for (date, jday) in workouts {
         pb.set_message(format!("Caching {}", date));
@@ -131,26 +117,7 @@ async fn get_dates_to_fetch(
     if dates.is_empty() {
         workouts::get_dates(data_access, None, None, 10000, false).await
     } else {
-        let mut all_dates: Vec<String> = vec![];
-        for range_str in dates {
-            let (oldest, latest) = match utils::parse_date_range(range_str) {
-                Ok(start_end) => start_end,
-                Err(e) => {
-                    return Err(format!("Invalid date range '{}': {}", range_str, e));
-                }
-            };
-            let count = ((oldest - latest).num_days().abs() + 1) as u32;
-            let dates = match workouts::get_dates(data_access, Some(latest.to_string()), Some(oldest.to_string()), count, false).await {
-                Ok(d) => d,
-                Err(e) => {
-                    return Err(format!("Error getting dates for range {}: {}", range_str, e));
-                }
-            };
-            all_dates.extend(dates);
-        }
-        all_dates.sort();
-        all_dates.dedup();
-        Ok(all_dates)
+        workouts::get_dates_from_ranges(data_access, dates).await
     }
 }
 
