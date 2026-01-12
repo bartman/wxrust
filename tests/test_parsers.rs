@@ -522,3 +522,86 @@ fn test_format_bw() {
     let formatted = format_set(&set);
     assert_eq!(formatted, "BW-10 x 5");
 }
+
+#[test]
+fn test_parser_options_kg() {
+    // Parse workout with weights that should be interpreted as kg
+    let text = "2025-01-21
+@ 100 kg bw
+#squat
+200 x 5
+";
+    let options = ParserOptions::new(true); // user wants kg
+    let jday = parse_workout_with_options(text, &options).unwrap();
+    
+    assert_eq!(jday.bw, Some(100.0)); // 100 kg
+    assert_eq!(jday.eblocks[0].sets[0].w, Some(200.0)); // 200 kg
+}
+
+#[test]
+fn test_parser_options_lbs() {
+    // Parse workout with weights that should be interpreted as lbs
+    let text = "2025-01-21
+@ 220 lbs bw
+#squat
+440 x 5
+";
+    let options = ParserOptions::new(false); // user wants lbs
+    let jday = parse_workout_with_options(text, &options).unwrap();
+    
+    // Body weight explicitly marked as lbs, so it converts to kg
+    assert_eq!(jday.bw, Some(220.0 / LBS_PER_KG));
+    
+    // Weight without explicit unit, should be interpreted as lbs and converted to kg
+    let expected_weight_kg = 440.0 / LBS_PER_KG;
+    assert!((jday.eblocks[0].sets[0].w.unwrap() - expected_weight_kg).abs() < 0.01);
+}
+
+#[test]
+fn test_parser_options_round_trip_lbs() {
+    // This test simulates the issue: format with lbs preference, then parse with lbs preference
+    forget_cached_user_wants_kg();
+    write_cached_user_wants_kg(false); // User prefers lbs
+    
+    // Create a workout with 100kg weight
+    let exercise = Exercise {
+        id: "squat".to_string(),
+        name: "squat".to_string(),
+        ex_type: None,
+    };
+    let ex_wrapper = ExerciseWrapper { exercise };
+    let sets = vec![
+        Set { w: Some(100.0), r: Some(5), s: Some(1), lb: Some(0.0), rpe: None, c: None, set_type: Some(0), usebw: None },
+    ];
+    let eblock = EBlock {
+        eid: "squat".to_string(),
+        sets,
+    };
+    let jday = JDay {
+        log: "EBLOCK:squat\n".to_string(),
+        bw: Some(100.0), // 100kg
+        eblocks: vec![eblock],
+        exercises: vec![ex_wrapper],
+    };
+    
+    // Format for cache (will use lbs since user wants lbs)
+    let cache_text = format_workout_for_cache("2025-01-21", &jday);
+    
+    // The cache should show weights in lbs
+    assert!(cache_text.contains("220")); // 100kg * 2.20462 ≈ 220 lbs bodyweight
+    assert!(cache_text.contains("lbs bw"));
+    
+    // Now parse it back with user wants lbs
+    let options = ParserOptions::new(false); // user wants lbs
+    let parsed = parse_workout_with_options(&cache_text, &options).unwrap();
+    
+    // The parsed weight should be back to ~100kg
+    let weight_diff = (parsed.eblocks[0].sets[0].w.unwrap() - 100.0).abs();
+    assert!(weight_diff < 0.1, "Weight should round-trip correctly, diff: {}", weight_diff);
+    
+    let bw_diff = (parsed.bw.unwrap() - 100.0).abs();
+    assert!(bw_diff < 0.1, "Body weight should round-trip correctly, diff: {}", bw_diff);
+    
+    // Cleanup
+    forget_cached_user_wants_kg();
+}

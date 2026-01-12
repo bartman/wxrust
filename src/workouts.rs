@@ -147,7 +147,10 @@ pub fn lookup_cached_jday(uid: u32, date: &str, verbose: bool) -> Option<models:
     if let Ok(cache_path) = get_cache_file_path(uid, date) {
         if cache_path.exists() {
             if let Ok(content) = fs::read_to_string(&cache_path) {
-                if let Ok(jday) = parsers::parse_workout(&content) {
+                // Use cached user preference to parse the cached workout
+                let user_wants_kg = read_cached_user_wants_kg_or(true);
+                let options = parsers::ParserOptions::new(user_wants_kg);
+                if let Ok(jday) = parsers::parse_workout_with_options(&content, &options) {
                     if verbose {
                         eprintln!("\x1b[34mgetting {} from cache {}\x1b[0m", date, cache_path.display());
                     }

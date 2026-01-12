@@ -8,6 +8,23 @@ lazy_static! {
     static ref BW_REGEX: Regex = Regex::new(r"^@ *([1-9][0-9]*\.?[0-9]*) *(kg|lbs)? *bw$").unwrap();
 }
 
+#[derive(Clone)]
+pub struct ParserOptions {
+    /// If true, weights without explicit units are interpreted as kg.
+    /// If false, weights without explicit units are interpreted as lbs.
+    pub user_wants_kg: bool,
+}
+
+impl ParserOptions {
+    pub fn new(user_wants_kg: bool) -> Self {
+        Self { user_wants_kg }
+    }
+
+    pub fn default() -> Self {
+        Self { user_wants_kg: true }
+    }
+}
+
 pub fn parse_bw_line(lines: &[&str], i: &mut usize) -> Result<Option<f32>, String> {
     // Skip empty lines
     while *i < lines.len() && lines[*i].trim().is_empty() {
@@ -43,6 +60,11 @@ pub fn parse_bw_line(lines: &[&str], i: &mut usize) -> Result<Option<f32>, Strin
 
 #[allow(dead_code)]
 pub fn parse_workout(text: &str) -> Result<JDay, String> {
+    parse_workout_with_options(text, &ParserOptions::default())
+}
+
+#[allow(dead_code)]
+pub fn parse_workout_with_options(text: &str, options: &ParserOptions) -> Result<JDay, String> {
     let lines: Vec<&str> = text.lines().collect();
     let mut i = 0;
 
@@ -101,7 +123,7 @@ pub fn parse_workout(text: &str) -> Result<JDay, String> {
             while i < lines.len() && !lines[i].starts_with('#') && !lines[i].starts_with("//") && !lines[i].trim().is_empty() {
                 let line = lines[i];
                 let set_line = line.trim();
-                match parse_set_line(set_line) {
+                match parse_set_line_with_options(set_line, options) {
                     Ok(set) => {
                         sets.extend(set);
                     }
@@ -276,7 +298,12 @@ pub fn parse_rpe(s: &str) -> Option<f32> {
     s.parse().ok()
 }
 
+#[allow(dead_code)]
 pub fn parse_set_line(line: &str) -> Result<Vec<Set>, String> {
+    parse_set_line_with_options(line, &ParserOptions::default())
+}
+
+pub fn parse_set_line_with_options(line: &str, options: &ParserOptions) -> Result<Vec<Set>, String> {
     let line = line.trim();
     let parts: Vec<&str> = line.split_whitespace().collect();
     if parts.is_empty() {
@@ -346,7 +373,8 @@ pub fn parse_set_line(line: &str) -> Result<Vec<Set>, String> {
         }
     }
     // Determine lb if any weights have lbs units
-    let store_w_in_lbs = false;
+    // When user_wants_kg is false, weights without explicit units are in lbs
+    let store_w_in_lbs = !options.user_wants_kg;
     let mut show_lb = 0.0;
     for (_, parsed_lb, _) in &weights {
         if *parsed_lb {
@@ -357,7 +385,12 @@ pub fn parse_set_line(line: &str) -> Result<Vec<Set>, String> {
     let mut result = Vec::new();
     for (w, parsed_lb, usebw) in weights {
         let mut w_in_kg = w;
+        // Convert to kg if needed:
+        // - If weight has explicit "lbs" unit, convert from lbs to kg
+        // - If weight has no explicit unit but user wants lbs (store_w_in_lbs=true), convert from lbs to kg
         if parsed_lb && !store_w_in_lbs {
+            w_in_kg = w / LBS_PER_KG
+        } else if !parsed_lb && store_w_in_lbs {
             w_in_kg = w / LBS_PER_KG
         }
         for &r in &reps {

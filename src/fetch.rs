@@ -84,7 +84,11 @@ fn parse_file_export(content: &str) -> Result<Vec<(String, models::JDay)>, Strin
     let lines: Vec<&str> = content.lines().collect();
     let date_regex = Regex::new(r"^\d{4}-\d{2}-\d{2}$").unwrap();
 
-    let mut workouts = Vec::new();
+    // Use cached user preference to parse the file
+    let user_wants_kg = workouts::read_cached_user_wants_kg_or(true);
+    let options = parsers::ParserOptions::new(user_wants_kg);
+
+    let mut workouts_list = Vec::new();
     let mut i = 0;
 
     while i < lines.len() {
@@ -100,14 +104,14 @@ fn parse_file_export(content: &str) -> Result<Vec<(String, models::JDay)>, Strin
             }
 
             let workout_text = format!("{}\n{}", date, workout_lines.join("\n"));
-            let jday = parsers::parse_workout(&workout_text).map_err(|e| format!("Failed to parse workout for {}: {}", date, e))?;
-            workouts.push((date, jday));
+            let jday = parsers::parse_workout_with_options(&workout_text, &options).map_err(|e| format!("Failed to parse workout for {}: {}", date, e))?;
+            workouts_list.push((date, jday));
         } else {
             i += 1;
         }
     }
 
-    Ok(workouts)
+    Ok(workouts_list)
 }
 
 async fn get_dates_to_fetch(
