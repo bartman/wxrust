@@ -12,6 +12,24 @@ lazy_static! {
     static ref USER_WANTS_KG: Mutex<Option<bool>> = Mutex::new(None);
 }
 
+fn filter_dates_by_range(dates: Vec<String>, oldest: Option<&str>, latest: Option<&str>) -> Vec<String> {
+    dates.into_iter()
+        .filter(|d| oldest.map_or(true, |old| d.as_str() >= old))
+        .filter(|d| latest.map_or(true, |lat| d.as_str() <= lat))
+        .collect()
+}
+
+fn limit_and_sort_dates(mut dates: Vec<String>, count: u32, reverse: bool) -> Vec<String> {
+    if count > 0 {
+        dates = dates.into_iter().rev().take(count as usize).collect();
+        dates.sort();
+    }
+    if reverse {
+        dates.reverse();
+    }
+    dates
+}
+
 fn get_cache_base_dir() -> Result<PathBuf, String> {
     let cache_dir = if let Ok(dir) = std::env::var("XDG_CACHE_HOME") {
         if !dir.is_empty() {
@@ -119,35 +137,10 @@ pub fn get_dates_from_cache(uid: u32, latest: Option<String>, oldest: Option<Str
     // Sort dates
     dates.sort();
 
-    // Filter by oldest and latest
-    let mut filtered: Vec<String> = dates.into_iter()
-        .filter(|d| {
-            if let Some(old) = &oldest {
-                d >= old
-            } else {
-                true
-            }
-        })
-        .filter(|d| {
-            if let Some(lat) = &latest {
-                d <= lat
-            } else {
-                true
-            }
-        })
-        .collect();
+    let filtered = filter_dates_by_range(dates, oldest.as_deref(), latest.as_deref());
+    let result = limit_and_sort_dates(filtered, count, reverse);
 
-    // Take the most recent count if specified
-    if count > 0 {
-        filtered = filtered.into_iter().rev().take(count as usize).collect();
-        filtered.sort();
-    }
-
-    if reverse {
-        filtered.reverse();
-    }
-
-    Ok(filtered)
+    Ok(result)
 }
 
 pub fn lookup_cached_jday(uid: u32, date: &str, verbose: bool) -> Option<models::JDay> {
@@ -303,24 +296,7 @@ query GetJRange($uid: ID!, $ymd: YMD!, $range: Int!) {
 
         date_strings.sort();
 
-        // Filter dates
-        let filtered: Vec<String> = date_strings.iter().cloned()
-            .filter(|d| {
-                if let Some(old) = &oldest {
-                    d >= old
-                } else {
-                    true
-                }
-            })
-            .filter(|d| {
-                if let Some(lat) = &latest {
-                    d <= lat
-                } else {
-                    true
-                }
-            })
-            .collect();
-
+        let filtered = filter_dates_by_range(date_strings.clone(), oldest.as_deref(), latest.as_deref());
         all_dates.extend(filtered);
 
         // Check if we have enough
@@ -349,16 +325,6 @@ query GetJRange($uid: ID!, $ymd: YMD!, $range: Int!) {
     all_dates.sort();
     all_dates.dedup();
 
-    let mut result = if count > 0 {
-        // Take the most recent count
-        all_dates.into_iter().rev().take(count as usize).collect()
-    } else {
-        all_dates
-    };
-
-    result.sort();
-    if reverse {
-        result.reverse();
-    }
+    let result = limit_and_sort_dates(all_dates, count, reverse);
     Ok(result)
 }

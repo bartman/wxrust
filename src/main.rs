@@ -48,6 +48,44 @@ enum Commands {
     Fetch(FetchArgs),
 }
 
+async fn setup_auth_and_data_access(
+    client: &ReqwestClient,
+    credentials_path: &str,
+    token_path: &str,
+    no_network: bool,
+    force_auth: bool,
+) -> (Option<String>, Option<u32>) {
+    let (token, uid) = if no_network {
+        // Load uid from cached token, no network login
+        let uid = match auth::load_uid_from_cache(&token_path) {
+            Ok(u) => u,
+            Err(e) => {
+                eprintln!("Failed to load cached token: {}", e);
+                eprintln!("Use without --no-network to authenticate first.");
+                utils::exit_with_error("");
+            }
+        };
+        (None, Some(uid))
+    } else {
+        // Normal login
+        let token = match auth::login(client, credentials_path, token_path, force_auth).await {
+            Ok(t) => t,
+            Err(e) => utils::exit_with_error(e),
+        };
+        let uid = match auth::decode_token(&token) {
+            Ok(claims) => claims.id,
+            Err(e) => utils::exit_with_error(format!("Failed to decode token: {}", e)),
+        };
+        let _user = match client.get_user_info(&token).await {
+            Ok(u) => u,
+            Err(e) => utils::exit_with_error(e),
+        };
+        (Some(token), Some(uid))
+    };
+
+    (token, uid)
+}
+
 #[derive(Parser)]
 struct ListArgs {
     #[arg(short, long)]
@@ -102,8 +140,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Validate mutually exclusive options
     if args.no_network && args.no_cache {
-        eprintln!("Error: --no-network and --no-cache are mutually exclusive");
-        std::process::exit(1);
+        utils::exit_with_error("Error: --no-network and --no-cache are mutually exclusive");
     }
 
     unsafe { std::env::set_var("WXRUST_COLOR", &args.color); }
@@ -135,7 +172,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 eprintln!("- {}/.config/wxrust/credentials.txt", home);
             }
             eprintln!("- ./credentials.txt");
-            std::process::exit(1);
+            utils::exit_with_error("");
         }
     };
 
@@ -143,44 +180,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::List(list) => {
             let client = ReqwestClient::new_with_verbose(args.verbose);
 
-            let (token, uid) = if args.no_network {
-                // Load uid from cached token, no network login
-                let uid = match auth::load_uid_from_cache(&token_path) {
-                    Ok(u) => u,
-                    Err(e) => {
-                        eprintln!("Failed to load cached token: {}", e);
-                        eprintln!("Use without --no-network to authenticate first.");
-                        std::process::exit(1);
-                    }
-                };
-                (None, Some(uid))
-            } else {
-                // Normal login
-                let token = match auth::login(&client, &credentials_path.as_str(), &token_path, args.force_auth).await {
-                    Ok(t) => t,
-                    Err(e) => {
-                        eprintln!("{}", e);
-                        std::process::exit(1);
-                    }
-                };
-                let uid = match auth::decode_token(&token) {
-                    Ok(claims) => claims.id,
-                    Err(e) => {
-                        eprintln!("Failed to decode token: {}", e);
-                        std::process::exit(1);
-                    }
-                };
-                let _user = match client.get_user_info(&token).await {
-                    Ok(u) => u,
-                    Err(e) => {
-                        eprintln!("{}", e);
-                        std::process::exit(1);
-                    }
-                };
-                (Some(token), Some(uid))
-            };
+            let (token, uid) = setup_auth_and_data_access(&client, &credentials_path, &token_path, args.no_network, args.force_auth).await;
 
-            let data_access = crate::api::DataAccess {
+            let data_access = api::DataAccess {
                 client: &client,
                 token: token.as_deref(),
                 uid,
@@ -202,10 +204,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 match workouts::get_dates(&data_access, latest, oldest, count, list.reverse).await {
                     Ok(d) => d,
-                    Err(e) => {
-                        eprintln!("{}", e);
-                        std::process::exit(1);
-                    }
+                    Err(e) => utils::exit_with_error(e),
                 }
             } else {
                 // Parse ranges
@@ -213,19 +212,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 for range_str in &list.dates {
                     let (oldest, latest) = match utils::parse_date_range(range_str) {
                         Ok(start_end) => start_end,
-                        Err(e) => {
-                            eprintln!("Invalid date range '{}': {}", range_str, e);
-                            std::process::exit(1);
-                        }
+                        Err(e) => utils::exit_with_error(format!("Invalid date range '{}': {}", range_str, e)),
                     };
                     let count = ((oldest - latest).num_days().abs() + 1) as u32;
                     let dates = match workouts::get_dates(&data_access,
                                         Some(latest.to_string()), Some(oldest.to_string()), count, false).await {
                         Ok(d) => d,
-                        Err(e) => {
-                            eprintln!("{}", e);
-                            std::process::exit(1);
-                        }
+                    Err(e) => utils::exit_with_error(e),
                     };
                     all_dates.extend(dates);
                 }
@@ -237,8 +230,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
 
             if dates_to_use.is_empty() {
-                eprintln!("No workouts found in the specified range");
-                std::process::exit(1);
+                utils::exit_with_error("No workouts found in the specified range");
             }
 
             if list.details || list.summary {
@@ -312,37 +304,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Show(show) => {
             let client = ReqwestClient::new_with_verbose(args.verbose);
 
-            let (token, uid) = if args.no_network {
-                // Load uid from cached token, no network login
-                let uid = match auth::load_uid_from_cache(&token_path) {
-                    Ok(u) => u,
-                    Err(e) => {
-                        eprintln!("Failed to load cached token: {}", e);
-                        eprintln!("Use without --no-network to authenticate first.");
-                        std::process::exit(1);
-                    }
-                };
-                (None, Some(uid))
-            } else {
-                // Normal login
-                let token = match auth::login(&client, &credentials_path.as_str(), &token_path, args.force_auth).await {
-                    Ok(t) => t,
-                    Err(e) => {
-                        eprintln!("{}", e);
-                        std::process::exit(1);
-                    }
-                };
-                let uid = match auth::decode_token(&token) {
-                    Ok(claims) => claims.id,
-                    Err(e) => {
-                        eprintln!("Failed to decode token: {}", e);
-                        std::process::exit(1);
-                    }
-                };
-                (Some(token), Some(uid))
-            };
+            let (token, uid) = setup_auth_and_data_access(&client, &credentials_path, &token_path, args.no_network, args.force_auth).await;
 
-            let data_access = crate::api::DataAccess {
+            let data_access = api::DataAccess {
                 client: &client,
                 token: token.as_deref(),
                 uid,
@@ -357,25 +321,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // Show last workout
                 let dates = match workouts::get_dates(&data_access, None, None, 1, false).await {
                     Ok(d) => d,
-                    Err(e) => {
-                        eprintln!("{}", e);
-                        std::process::exit(1);
-                    }
+                    Err(e) => utils::exit_with_error(e),
                 };
                 if let Some(d) = dates.get(0) {
                     d.clone()
                 } else {
-                    eprintln!("No workouts found");
-                    std::process::exit(1);
+                    utils::exit_with_error("No workouts found");
                 }
             };
 
             let jday = match workouts::get_jday(&data_access, &date, args.verbose).await {
                 Ok(j) => j,
-                Err(e) => {
-                    eprintln!("{}", e);
-                    std::process::exit(1);
-                }
+                Err(e) => utils::exit_with_error(e),
             };
 
             if show.summary {
@@ -399,37 +356,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Fetch(fetch_args) => {
             let client = ReqwestClient::new_with_verbose(args.verbose);
 
-            let (token, uid) = if args.no_network {
-                // Load uid from cached token, no network login
-                let uid = match auth::load_uid_from_cache(&token_path) {
-                    Ok(u) => u,
-                    Err(e) => {
-                        eprintln!("Failed to load cached token: {}", e);
-                        eprintln!("Use without --no-network to authenticate first.");
-                        std::process::exit(1);
-                    }
-                };
-                (None, Some(uid))
-            } else {
-                // Normal login
-                let token = match auth::login(&client, &credentials_path.as_str(), &token_path, args.force_auth).await {
-                    Ok(t) => t,
-                    Err(e) => {
-                        eprintln!("{}", e);
-                        std::process::exit(1);
-                    }
-                };
-                let uid = match auth::decode_token(&token) {
-                    Ok(claims) => claims.id,
-                    Err(e) => {
-                        eprintln!("Failed to decode token: {}", e);
-                        std::process::exit(1);
-                    }
-                };
-                (Some(token), Some(uid))
-            };
+            let (token, uid) = setup_auth_and_data_access(&client, &credentials_path, &token_path, args.no_network, args.force_auth).await;
 
-            let data_access = crate::api::DataAccess {
+            let data_access = api::DataAccess {
                 client: &client,
                 token: token.as_deref(),
                 uid,
@@ -446,8 +375,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 fetch_args.file.as_deref(),
                 args.verbose,
             ).await {
-                eprintln!("{}", e);
-                std::process::exit(1);
+                utils::exit_with_error(e);
             }
         }
     }

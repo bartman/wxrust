@@ -18,6 +18,40 @@ pub trait ApiClient: Send + Sync {
     async fn user_wants_kg(&self, token: &str) -> bool;
 }
 
+fn log_verbose_request(query: &str, variables: Option<&serde_json::Value>, verbose: bool) {
+    if verbose {
+        let mut output = format!("Query:\n{}", query);
+        if let Some(vars) = variables {
+            output += &format!("\nVariables: {}", serde_json::to_string_pretty(vars).unwrap_or("Failed".to_string()));
+        }
+        let colored = if *STDERR_COLOR_ENABLED {
+            Colour::Blue.paint(output).to_string()
+        } else {
+            output
+        };
+        eprintln!("{}", colored);
+    }
+}
+
+fn log_verbose_response(text: &str, status: reqwest::StatusCode, verbose: bool) {
+    if verbose {
+        let colored = if status.is_success() {
+            if *STDERR_COLOR_ENABLED {
+                Colour::Green.paint(text).to_string()
+            } else {
+                text.to_string()
+            }
+        } else {
+            if *STDERR_COLOR_ENABLED {
+                Colour::Red.paint(text).to_string()
+            } else {
+                text.to_string()
+            }
+        };
+        eprintln!("{}", colored);
+    }
+}
+
 pub struct DataAccess<'a, C: ApiClient> {
     pub client: &'a C,
     pub token: Option<&'a str>,
@@ -48,16 +82,7 @@ impl ReqwestClient {
 #[async_trait]
 impl ApiClient for ReqwestClient {
     async fn login_request(&self, request: &GraphQLRequest) -> Result<GraphQLResponse<crate::models::LoginData>, Box<dyn std::error::Error>> {
-        if self.verbose {
-            let mut output = format!("Query:\n{}", request.query);
-            output += &format!("\nVariables: {}", serde_json::to_string_pretty(&request.variables).unwrap_or("Failed".to_string()));
-            let colored = if *STDERR_COLOR_ENABLED {
-                Colour::Blue.paint(output).to_string()
-            } else {
-                output
-            };
-            eprintln!("{}", colored);
-        }
+        log_verbose_request(&request.query, Some(&serde_json::to_value(&request.variables).unwrap()), self.verbose);
         let response = self.client
             .post("https://weightxreps.net/api/graphql")
             .json(request)
@@ -65,39 +90,13 @@ impl ApiClient for ReqwestClient {
             .await?;
         let status = response.status();
         let text = response.text().await?;
-        if self.verbose {
-            let colored = if status.is_success() {
-                if *STDERR_COLOR_ENABLED {
-                    Colour::Green.paint(&text).to_string()
-                } else {
-                    text.clone()
-                }
-            } else {
-                if *STDERR_COLOR_ENABLED {
-                    Colour::Red.paint(&text).to_string()
-                } else {
-                    text.clone()
-                }
-            };
-            eprintln!("{}", colored);
-        }
+        log_verbose_response(&text, status, self.verbose);
         let body: GraphQLResponse<crate::models::LoginData> = serde_json::from_str(&text)?;
         Ok(body)
     }
 
     async fn graphql_request<T: DeserializeOwned + 'static>(&self, token: &str, query: &str, variables: Option<serde_json::Value>) -> Result<GraphQLResponse<T>, Box<dyn std::error::Error>> {
-        if self.verbose {
-            let mut output = format!("Query:\n{}", query);
-            if let Some(vars) = &variables {
-                output += &format!("\nVariables: {}", serde_json::to_string_pretty(vars).unwrap_or("Failed".to_string()));
-            }
-            let colored = if *STDERR_COLOR_ENABLED {
-                Colour::Blue.paint(output).to_string()
-            } else {
-                output
-            };
-            eprintln!("{}", colored);
-        }
+        log_verbose_request(query, variables.as_ref(), self.verbose);
         let request_body = if let Some(vars) = variables {
             serde_json::json!({ "query": query, "variables": vars })
         } else {
@@ -111,22 +110,7 @@ impl ApiClient for ReqwestClient {
             .await?;
         let status = response.status();
         let text = response.text().await?;
-        if self.verbose {
-            let colored = if status.is_success() {
-                if *STDERR_COLOR_ENABLED {
-                    Colour::Green.paint(&text).to_string()
-                } else {
-                    text.clone()
-                }
-            } else {
-                if *STDERR_COLOR_ENABLED {
-                    Colour::Red.paint(&text).to_string()
-                } else {
-                    text.clone()
-                }
-            };
-            eprintln!("{}", colored);
-        }
+        log_verbose_response(&text, status, self.verbose);
         let body: GraphQLResponse<T> = serde_json::from_str(&text)?;
         Ok(body)
     }

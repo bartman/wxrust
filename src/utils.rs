@@ -1,5 +1,10 @@
 use chrono::{NaiveDate, Datelike};
 
+pub fn exit_with_error<E: std::fmt::Display>(error: E) -> ! {
+    eprintln!("{}", error);
+    std::process::exit(1);
+}
+
 pub fn parse_date_range(range: &str) -> Result<(NaiveDate, NaiveDate), String> {
     let parts: Vec<&str> = range.split("..").collect();
     if parts.len() == 1 {

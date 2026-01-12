@@ -426,6 +426,27 @@ fn test_format_rpe() {
 }
 
 #[test]
+fn test_parse_bw_line() {
+    let lines = vec!["@ 215 bw", "#exercise"];
+    let mut i = 0;
+    let bw = parse_bw_line(&lines, &mut i).unwrap();
+    assert_eq!(bw, Some(215.0));
+    assert_eq!(i, 1);
+
+    let lines2 = vec!["@ 200 lbs bw", "#exercise"];
+    let mut i2 = 0;
+    let bw2 = parse_bw_line(&lines2, &mut i2).unwrap();
+    assert_eq!(bw2, Some(200.0 / LBS_PER_KG));
+    assert_eq!(i2, 1);
+
+    let lines3 = vec!["#exercise"];
+    let mut i3 = 0;
+    let bw3 = parse_bw_line(&lines3, &mut i3).unwrap();
+    assert_eq!(bw3, None);
+    assert_eq!(i3, 0);
+}
+
+#[test]
 fn test_format_bw() {
     let set = Set {
         w: Some(0.0),
