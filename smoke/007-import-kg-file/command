@@ -1,2 +1,2 @@
-{{PROGRAM_PATH}} --no-network fetch --file {{SMOKE_DIR}}/006-import-lbs-file/2025-12-24.txt
+{{PROGRAM_PATH}} --no-network fetch --file {{SMOKE_DIR}}/007-import-kg-file/2025-12-24.txt
 {{PROGRAM_PATH}} --no-network show 2025-12-24

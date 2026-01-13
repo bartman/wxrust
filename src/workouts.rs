@@ -66,7 +66,7 @@ pub fn read_cached_user_wants_kg() -> Option<bool> {
             }
         };
     }
-//eprintln!("#### RD cache -> {}", guard.unwrap());
+//eprintln!("#### RD cache -> {:?}", *guard);
     *guard
 }
 

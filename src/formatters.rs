@@ -137,6 +137,8 @@ pub fn format_weight(w: f32, w_in_lbs: bool, options: &FormatOptions) -> String 
     } else {
         w
     };
+    //eprintln!("formatter: w_in_lbs = {}, display_in_lbs = {}, w = {}, num = {}",
+    //    w_in_lbs, display_in_lbs, w, num);
     let unit_str = if display_in_lbs { "lbs" } else { "kg" };
     if options.show_unit_name {
         format!("{:.0} {}", num, unit_str)

@@ -392,6 +392,9 @@ pub fn parse_set_line_with_options(line: &str, options: &ParserOptions) -> Resul
         } else {
             w
         };
+        //eprintln!("parser: line = {}", line);
+        //eprintln!("parser: parsed_lb = {}, weights_without_unit_are_lbs = {}, w = {}, w_in_kg = {}",
+        //    parsed_lb, weights_without_unit_are_lbs, w, w_in_kg);
         for &r in &reps {
             result.push(Set {
                 w: Some(w_in_kg),
