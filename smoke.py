@@ -52,7 +52,10 @@ def run_test(test_dir, variables, output_file, verbose):
         return False, "No command file"
 
     with open(command_file, 'r') as f:
-        command = f.read().strip()
+        command_text = f.read().strip()
+
+    # Split into multiple commands (one per line, ignoring empty lines)
+    commands = [line.strip() for line in command_text.split('\n') if line.strip()]
 
     flags_file = test_dir / "flags"
     flags = load_flags(flags_file)
@@ -61,25 +64,41 @@ def run_test(test_dir, variables, output_file, verbose):
     ignore_blank_lines = flags.get('ignore-blank-lines', False)
     ignore_white_space = flags.get('ignore-white-space', False)
 
-    if verbose:
-        print(f"Command (before substitution): {command}", file=output_file)
+    # Execute all commands, accumulating output
+    all_stdout = []
+    all_stderr = []
+    last_returncode = 0
 
-    try:
-        command = substitute_variables(command, variables)
-    except ValueError as e:
-        return False, str(e)
+    for cmd_idx, command in enumerate(commands):
+        if verbose:
+            print(f"Command {cmd_idx+1} (before substitution): {command}", file=output_file)
 
-    if verbose:
-        print(f"Command (after substitution): {command}", file=output_file)
+        try:
+            command = substitute_variables(command, variables)
+        except ValueError as e:
+            return False, str(e)
 
-    # Execute command
-    try:
-        result = subprocess.run(command, shell=True, capture_output=True, text=True, cwd=os.getcwd())
-        stdout = result.stdout
-        stderr = result.stderr
-        returncode = result.returncode
-    except Exception as e:
-        return False, f"Execution failed: {e}"
+        if verbose:
+            print(f"Command {cmd_idx+1} (after substitution): {command}", file=output_file)
+
+        # Execute command
+        try:
+            result = subprocess.run(command, shell=True, capture_output=True, text=True, cwd=os.getcwd())
+            all_stdout.append(result.stdout)
+            all_stderr.append(result.stderr)
+            last_returncode = result.returncode
+            
+            # Stop if command failed
+            if result.returncode != 0:
+                if verbose:
+                    print(f"Command {cmd_idx+1} failed with code {result.returncode}", file=output_file)
+                break
+        except Exception as e:
+            return False, f"Execution failed: {e}"
+
+    stdout = ''.join(all_stdout)
+    stderr = ''.join(all_stderr)
+    returncode = last_returncode
 
     # Write outputs to work_dir
     output_dir = Path(variables['WORK_DIR']) / test_dir.name
@@ -95,11 +114,11 @@ def run_test(test_dir, variables, output_file, verbose):
             expected_stdout = f.read()
         expected_stdout = normalize(expected_stdout, ignore_case, ignore_blank_lines, ignore_white_space)
         actual_stdout = normalize(stdout, ignore_case, ignore_blank_lines, ignore_white_space)
-    if actual_stdout != expected_stdout:
-        diff = list(difflib.unified_diff(expected_stdout.splitlines(keepends=True), actual_stdout.splitlines(keepends=True), fromfile='expected', tofile='actual'))
-        print(f"Diff for {test_dir.name} stdout:", file=output_file)
-        print(''.join(diff), file=output_file)
-        return False, f"stdout mismatch\nExpected: {expected_stdout_file}\nActual: {output_dir / 'output.stdout'}"
+        if actual_stdout != expected_stdout:
+            diff = list(difflib.unified_diff(expected_stdout.splitlines(keepends=True), actual_stdout.splitlines(keepends=True), fromfile='expected', tofile='actual'))
+            print(f"Diff for {test_dir.name} stdout:", file=output_file)
+            print(''.join(diff), file=output_file)
+            return False, f"stdout mismatch\nExpected: {expected_stdout_file}\nActual: {output_dir / 'output.stdout'}"
 
     # Compare stderr
     expected_stderr_file = test_dir / "expected.stderr"
