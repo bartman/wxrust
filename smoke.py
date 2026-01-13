@@ -51,6 +51,19 @@ def run_test(test_dir, variables, output_file, verbose):
     if not command_file.exists():
         return False, "No command file"
 
+    # Copy cache files if they exist (for test setup)
+    test_cache_dir = test_dir / "cache"
+    if test_cache_dir.exists():
+        cache_dir = Path(variables['CACHE_DIR'])
+        for item in test_cache_dir.rglob('*'):
+            if item.is_file():
+                relative = item.relative_to(test_cache_dir)
+                dest = cache_dir / relative
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(str(item), str(dest))
+                if verbose:
+                    print(f"Copied cache file: {relative}", file=output_file)
+
     with open(command_file, 'r') as f:
         command_text = f.read().strip()
 
@@ -81,9 +94,11 @@ def run_test(test_dir, variables, output_file, verbose):
         if verbose:
             print(f"Command {cmd_idx+1} (after substitution): {command}", file=output_file)
 
-        # Execute command
+        # Execute command with XDG_CACHE_HOME set to isolated cache directory
         try:
-            result = subprocess.run(command, shell=True, capture_output=True, text=True, cwd=os.getcwd())
+            env = os.environ.copy()
+            env['XDG_CACHE_HOME'] = variables['CACHE_DIR']
+            result = subprocess.run(command, shell=True, capture_output=True, text=True, cwd=os.getcwd(), env=env)
             all_stdout.append(result.stdout)
             all_stderr.append(result.stderr)
             last_returncode = result.returncode
@@ -190,6 +205,11 @@ def main():
     work_dir = args.work_dir or f'/tmp/{project_name}-{pid}'
     variables['WORK_DIR'] = work_dir
     os.makedirs(work_dir, exist_ok=True)
+    
+    # Set up cache dir within work dir
+    cache_dir = os.path.join(work_dir, 'cache')
+    os.makedirs(cache_dir, exist_ok=True)
+    variables['CACHE_DIR'] = cache_dir
 
     # Set up output
     output_file = None
