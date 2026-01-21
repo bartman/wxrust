@@ -243,6 +243,23 @@ fn test_table_state_process_set_invalid_input() {
     assert!(state.records.is_empty());
 }
 
+#[test]
+fn test_table_state_process_set_same_day_same_reps_update() {
+    let mut state = TableState::new();
+
+    // First set for 5 reps
+    state.process_set("2025-01-01", "Deadlift", Some(80.0), 100.0, 5);
+    assert_eq!(state.records.len(), 1);
+    assert_eq!(state.records[0].best_weight, 100.0);
+    assert_eq!(state.records[0].best_reps, 5);
+
+    // Better weight for same reps on same day - should update existing record
+    state.process_set("2025-01-01", "Deadlift", Some(80.0), 110.0, 5);
+    assert_eq!(state.records.len(), 1); // Still only 1 record
+    assert_eq!(state.records[0].best_weight, 110.0); // Updated weight
+    assert_eq!(state.records[0].best_reps, 5); // Same reps
+}
+
 // ============================================================================
 // Workout Processing Tests
 // ============================================================================
@@ -364,7 +381,7 @@ fn test_format_table_with_records() {
     let output = format_table(&state, &filters, true);
 
     assert!(output.contains("dead")); // Filter name in header
-    assert!(output.contains("count = 1")); // Count in header
+    assert!(output.contains("There were 1 records of dead")); // Count in header
     assert!(output.contains("2025-01-01")); // Date in output
     assert!(output.contains("Deadlift")); // Exercise name
 }
