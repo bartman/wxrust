@@ -103,7 +103,7 @@ fn test_summarize_workout() {
         exercises: vec![ex_wrapper],
     };
     unsafe { std::env::set_var("WXRUST_COLOR", "never"); }
-    let summary = summarize_workout(&jday);
+    let summary = summarize_workout(&jday, true);
     assert_eq!(summary, "#Squat  145x3");  // Max weight 145, max reps 3
 }
 

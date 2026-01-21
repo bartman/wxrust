@@ -291,8 +291,8 @@ fn format_single_eblock_internal(jday: &JDay, eblock: &EBlock, options: &FormatO
     lines.join("\n")
 }
 
-pub fn summarize_workout(jday: &JDay) -> String {
-    summarize_workout_internal(jday, &FormatOptions::for_display(true))
+pub fn summarize_workout(jday: &JDay, user_wants_kg: bool) -> String {
+    summarize_workout_internal(jday, &FormatOptions::for_display(user_wants_kg))
 }
 
 fn summarize_workout_internal(jday: &JDay, options: &FormatOptions) -> String {

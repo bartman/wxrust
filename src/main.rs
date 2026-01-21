@@ -272,7 +272,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             }
                         } else if list.summary {
                             let fmt_date = formatters::color_date(&date);
-                            let summary = formatters::summarize_workout(&jday);
+                            let summary = formatters::summarize_workout(&jday, user_wants_kg);
                             println!("{} {}", fmt_date, summary);
                         }
                         next_seq += 1;
@@ -318,12 +318,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Err(e) => utils::exit_with_error(e),
             };
 
+            let user_wants_kg = workouts::resolve_user_wants_kg(&data_access).await;
             if show.summary {
                 let fmt_date = formatters::color_date(&date);
-                let summary = formatters::summarize_workout(&jday);
+                let summary = formatters::summarize_workout(&jday, user_wants_kg);
                 println!("{} {}", fmt_date, summary);
             } else {
-                let user_wants_kg = workouts::resolve_user_wants_kg(&data_access).await;
                 let workout = formatters::format_workout(&date, &jday, user_wants_kg);
                 print!("{}", workout);
                 if !workout.ends_with('\n') {
