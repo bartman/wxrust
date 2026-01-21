@@ -78,7 +78,7 @@ You can look in `weightxreps-client/src/data/generated---db-types-and-hooks.tsx`
 - Robust workout parsing that treats invalid exercise blocks (lone # or #exercise with no valid sets) as comments
 - Data access control options: `--force-authentication`, `--no-network`, `--no-cache`, `--no-cache-write` for flexible offline/online operation modes
 - Unit-aware parsing: Parser uses cached user unit preference (`user_wants_kg`) to correctly interpret weights without explicit units when reading from cache or importing files, preventing 2.2x multiplier errors in offline mode
-- Table command for PR progression: Displays personal records over time with 1RM calculations (Brzycki formula), date/exercise filtering, age-based color gradient (256-color ANSI), and projected weights for rep ranges 1-10
+- Table command for PR progression: Displays personal records over time with 1RM calculations (Brzycki formula), date/exercise filtering, age-based color gradient (256-color ANSI), projected weights for rep ranges 1-10, and deterministic processing in chronological order
 
 ## Dependencies Added
 
@@ -181,6 +181,7 @@ The `table` command displays PR progression similar to the C implementation in `
 - **Color Gradient**: 20-step gradient from cool (older) to warm (newer) colors using 256-color ANSI codes
 - **Recent Highlighting**: Records within 7 days get bright yellow
 - **Output Format**: Table with date, days ago, body weight, exercise, 1RM, and projected weights for 1-10 reps
+- **Deterministic Processing**: Workouts are processed in chronological date order to ensure consistent PR tracking regardless of async completion order
 
 Unlike the C version which shows separate tables per filter, the Rust implementation combines all matching exercises into one table.
 

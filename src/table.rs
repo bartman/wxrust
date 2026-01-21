@@ -503,7 +503,7 @@ pub async fn handle_table<C: ApiClient + Clone + Send + Sync + 'static>(
         let write_cache = data_access.write_cache;
         let uid = data_access.uid;
         let tx_clone = tx.clone();
-        let verbose = verbose;
+        //let verbose = verbose;
 
         tokio::spawn(async move {
             let data_access_clone = crate::api::DataAccess {
@@ -528,10 +528,17 @@ pub async fn handle_table<C: ApiClient + Clone + Send + Sync + 'static>(
     }
     drop(tx);
 
-    // Collect results and process
-    let mut state = TableState::new();
+    // Collect results and process in date order for deterministic PR tracking
+    let mut results = Vec::new();
+    while let Some(result) = rx.recv().await {
+        results.push(result);
+    }
 
-    while let Some((date, jday_opt)) = rx.recv().await {
+    // Sort by date to ensure chronological processing
+    results.sort_by(|a, b| a.0.cmp(&b.0));
+
+    let mut state = TableState::new();
+    for (date, jday_opt) in results {
         if let Some(jday) = jday_opt {
             process_workout(&jday, &date, &filters, &mut state);
         }
