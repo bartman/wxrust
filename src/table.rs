@@ -9,6 +9,7 @@ use crate::models::{JDay, Exercise};
 use crate::workouts;
 use crate::utils;
 use crate::formatters::STDERR_COLOR_ENABLED;
+use crate::parsers::LBS_PER_KG;
 
 /// Maximum reps to track for rep-specific PRs
 const MAX_REPS: usize = 10;
@@ -71,6 +72,16 @@ pub fn weight_from_1rm(onerm: f32, reps: u32) -> f32 {
         return onerm / 2.0; // Rough estimate
     }
     onerm / (36.0 / (37.0 - reps as f32))
+}
+
+/// Convert weight from kg to display units
+/// Weights in the API are stored in kg; convert to lbs if user_wants_kg is false
+pub fn convert_weight_for_display(weight_kg: f32, user_wants_kg: bool) -> f32 {
+    if user_wants_kg {
+        weight_kg
+    } else {
+        weight_kg * LBS_PER_KG
+    }
 }
 
 // ============================================================================
@@ -342,17 +353,21 @@ pub fn format_table(state: &TableState, filters: &[String], user_wants_kg: bool)
         let coldim = fg_256(BRIGHT_BLACK);
         let reset = col_reset();
 
-        // Track best weight for this rep range
+        // Convert weights for display
+        let display_weight = convert_weight_for_display(record.best_weight, user_wants_kg);
+        let display_1rm = convert_weight_for_display(record.best_1rm, user_wants_kg);
+
+        // Track best weight for this rep range (in display units)
         let r = if record.best_reps > MAX_REPS as u32 { MAX_REPS } else { record.best_reps as usize };
-        if r <= MAX_REPS && best_lifted[r] < record.best_weight {
-            best_lifted[r] = record.best_weight;
+        if r <= MAX_REPS && best_lifted[r] < display_weight {
+            best_lifted[r] = display_weight;
             best_col[r] = col;
         }
 
         // Format margin for high-rep sets (> MAX_REPS)
         let margin = if record.best_reps > MAX_REPS as u32 {
             format!(" {}{:.0}{} x {}",
-                coltxt, record.best_weight, reset, record.best_reps)
+                coltxt, display_weight, reset, record.best_reps)
         } else {
             String::new()
         };
@@ -360,7 +375,7 @@ pub fn format_table(state: &TableState, filters: &[String], user_wants_kg: bool)
         // Format body weight
         let bw_str = match record.body_weight {
             Some(bw) if bw > 0.0 => {
-                let display_bw = if user_wants_kg { bw } else { bw * 2.20462 };
+                let display_bw = convert_weight_for_display(bw, user_wants_kg);
                 format!("{:5.1}", display_bw)
             }
             _ => "     ".to_string(),
@@ -372,7 +387,7 @@ pub fn format_table(state: &TableState, filters: &[String], user_wants_kg: bool)
             coltxt, days_ago, reset,
             bw_str,
             record.exercise_name,
-            coltxt, record.best_1rm, reset,
+            coltxt, display_1rm, reset,
             lift_width = lift_width,
         ));
 
@@ -384,7 +399,9 @@ pub fn format_table(state: &TableState, filters: &[String], user_wants_kg: bool)
                 &coldim
             };
 
-            let projected_weight = weight_from_1rm(record.best_1rm, rep as u32);
+            // Calculate projected weight in kg, then convert for display
+            let projected_weight_kg = weight_from_1rm(record.best_1rm, rep as u32);
+            let projected_weight = convert_weight_for_display(projected_weight_kg, user_wants_kg);
             output.push_str(&format!("{}{:4.0}{} |", colrep, projected_weight, reset));
         }
 
@@ -560,6 +577,16 @@ mod tests {
         // Edge cases
         assert_eq!(weight_from_1rm(0.0, 5), 0.0);
         assert_eq!(weight_from_1rm(100.0, 0), 0.0);
+    }
+
+    #[test]
+    fn test_convert_weight_for_display() {
+        // User wants kg - no conversion
+        assert_eq!(convert_weight_for_display(100.0, true), 100.0);
+
+        // User wants lbs - convert from kg
+        let lbs = convert_weight_for_display(100.0, false);
+        assert!((lbs - 220.462).abs() < 0.1); // 100 kg * 2.20462
     }
 
     #[test]
