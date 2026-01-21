@@ -78,6 +78,7 @@ You can look in `weightxreps-client/src/data/generated---db-types-and-hooks.tsx`
 - Robust workout parsing that treats invalid exercise blocks (lone # or #exercise with no valid sets) as comments
 - Data access control options: `--force-authentication`, `--no-network`, `--no-cache`, `--no-cache-write` for flexible offline/online operation modes
 - Unit-aware parsing: Parser uses cached user unit preference (`user_wants_kg`) to correctly interpret weights without explicit units when reading from cache or importing files, preventing 2.2x multiplier errors in offline mode
+- Table command for PR progression: Displays personal records over time with 1RM calculations (Brzycki formula), date/exercise filtering, age-based color gradient (256-color ANSI), and projected weights for rep ranges 1-10
 
 ## Dependencies Added
 
@@ -169,6 +170,19 @@ Recent refactoring extracted common code into helper functions to improve mainta
   - `utils::create_progress_bar`: Standardized progress bar creation using `indicatif`.
 
 These changes follow the project's guidelines for splitting functionality into helpers and writing unit tests.
+
+## Table Command Implementation
+
+The `table` command displays PR progression similar to the C implementation in `wxrtools/test/test-table.c`. Key components:
+
+- **Argument Classification**: Uses `is_date_arg()` to detect if argument is a date (YYYY, YYYY-MM, etc.) vs exercise filter
+- **1RM Calculation**: Brzycki formula: `1RM = weight * (36.0 / (37.0 - reps))`
+- **PR Tracking**: `TableState` tracks best 1RM for each rep range (1-10), adds records only when a new PR is set
+- **Color Gradient**: 20-step gradient from cool (older) to warm (newer) colors using 256-color ANSI codes
+- **Recent Highlighting**: Records within 7 days get bright yellow
+- **Output Format**: Table with date, days ago, body weight, exercise, 1RM, and projected weights for 1-10 reps
+
+Unlike the C version which shows separate tables per filter, the Rust implementation combines all matching exercises into one table.
 
 ## Future Improvements
 

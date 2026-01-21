@@ -6,6 +6,7 @@ mod workouts;
 mod utils;
 mod parsers;
 mod fetch;
+mod table;
 
 use clap::{Parser, Subcommand};
 
@@ -46,6 +47,7 @@ enum Commands {
     List(ListArgs),
     Show(ShowArgs),
     Fetch(FetchArgs),
+    Table(TableArgs),
 }
 
 async fn setup_auth_and_data_access(
@@ -129,6 +131,13 @@ struct FetchArgs {
     file: Option<String>,
 
     dates: Vec<String>,
+}
+
+#[derive(Parser)]
+struct TableArgs {
+    /// Arguments can be dates (YYYY, YYYY-MM, YYYY-MM-DD, etc.) or exercise filters
+    /// Dates filter the date range, non-dates filter by exercise name (substring match)
+    args: Vec<String>,
 }
 
 async fn handle_list(
@@ -353,6 +362,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         Commands::Fetch(fetch_args) => {
             handle_fetch(&fetch_args, data_access, args.verbose).await;
+        },
+        Commands::Table(table_args) => {
+            table::handle_table(&client, &token, data_access, &table_args.args, args.verbose).await;
         }
     }
 

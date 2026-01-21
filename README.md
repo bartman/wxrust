@@ -84,6 +84,27 @@ Create a `credentials.txt` file with your WeightXReps account email on the first
 - Force re-download: `wxrust fetch --force 2025`
 - Import from text export file: `wxrust fetch --file export.txt`
 
+#### Table Command (PR Progression)
+
+Display a progression table showing personal records (PRs) over time for specific exercises.
+
+- Show PRs for all exercises: `wxrust table`
+- Filter by exercise name: `wxrust table deadlift`
+- Multiple filters (OR logic): `wxrust table deadlift squat`
+- Filter by date range: `wxrust table 2025`
+- Combine date and exercise filters: `wxrust table 2025 deadlift`
+
+Arguments are automatically classified as dates or exercise filters:
+- **Date formats**: `YYYY`, `YYYY-MM`, `YYYY.MM`, `YYYYMM`, `YYYY-MM-DD`, `YYYY.MM.DD`, `YYYYMMDD`
+- **Everything else**: Treated as exercise name filter (case-insensitive substring match)
+
+The table shows:
+- Date of each PR, days ago, body weight
+- Exercise name and estimated 1RM (Brzycki formula)
+- Projected weights for rep ranges 1-10
+- Color gradient from oldest (cool colors) to newest (warm colors)
+- Records within 7 days highlighted in bright yellow
+
 ### Examples
 
 ```bash
@@ -107,6 +128,12 @@ wxrust fetch 2025
 
 # Show differences for October workouts
 wxrust fetch --diff 2025-10
+
+# Show PR progression table for deadlifts in 2025
+wxrust table 2025 deadlift
+
+# Show all PRs for squats
+wxrust table squat
 
 # Disable colors
 wxrust --color never list --summary --count 1
