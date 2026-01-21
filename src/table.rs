@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ops::Index;
 
 use chrono::{NaiveDate, Utc};
 use lazy_static::lazy_static;
@@ -131,6 +132,7 @@ pub struct Record {
 pub struct TableState {
     /// Best 1RM seen for each rep count (1-10)
     pub best_1rm_for_reps: [f32; MAX_REPS + 1],
+    pub best_1rm_index: [isize; MAX_REPS + 1],
     /// All records collected
     pub records: Vec<Record>,
     /// Maximum exercise name width for formatting
@@ -141,6 +143,7 @@ impl TableState {
     pub fn new() -> Self {
         TableState {
             best_1rm_for_reps: [0.0; MAX_REPS + 1],
+            best_1rm_index: [-1; MAX_REPS + 1],
             records: Vec::new(),
             max_lift_width: 0,
         }
@@ -164,18 +167,32 @@ impl TableState {
 
         // Check if this is a new PR for this rep range
         let is_new_rep_pr = r <= MAX_REPS && self.best_1rm_for_reps[r] < ent_1rm;
-        if is_new_rep_pr {
-            self.best_1rm_for_reps[r] = ent_1rm;
+        if ! is_new_rep_pr { return; };
+
+        // Check if this PR replaces an existing PR on the same day
+        let old_index = self.best_1rm_index[r];
+        let mut replacing_old_index =
+        if old_index >= 0 {
+            let old_index = old_index as usize;
+            let old_record = self.records.index(old_index);
+
+            old_record.date == date
+        } else { false };
+
+        if replacing_old_index {
+            let old_index = old_index as usize;
+
+            if self.records[old_index].best_reps == reps {
+
+                self.records[old_index].date = date.to_string();
+                self.records[old_index].best_weight = weight;
+
+            } else {
+                replacing_old_index = false;
+            }
         }
 
-        // Check if we should add a record
-        // We add a record if this is a new overall best 1RM for this exercise
-        // The C code tracks per-lift per-session, but we're combining into one table
-        // So we track globally and add when it's a new best
-
-        // For simplicity in combined mode: add record if it's a new rep-range PR
-        // This matches the C behavior of tracking progression
-        if is_new_rep_pr {
+        if ! replacing_old_index {
             let record = Record {
                 date: date.to_string(),
                 exercise_name: exercise_name.to_string(),
@@ -185,13 +202,21 @@ impl TableState {
                 best_1rm: ent_1rm,
             };
 
-            let width = exercise_name.len();
-            if self.max_lift_width < width {
-                self.max_lift_width = width;
-            }
-
             self.records.push(record);
+            self.best_1rm_for_reps[r] = ent_1rm;
+            self.best_1rm_index[r] = (self.records.len() - 1) as isize;
+        };
+
+        let width = exercise_name.len();
+        if self.max_lift_width < width {
+            self.max_lift_width = width;
         }
+    }
+}
+
+impl Default for TableState {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -328,8 +353,8 @@ pub fn format_table(state: &TableState, filters: &[String], user_wants_kg: bool)
     } else {
         filters.join(", ")
     };
-    output.push_str(&format!("{} count = {}, days = {}\n",
-        filter_str, sorted_records.len(), total_days));
+    output.push_str(&format!("There were {} records of {}, over {} days\n",
+        sorted_records.len(), filter_str, total_days));
 
     // Track best weight lifted for each rep range
     let mut best_lifted: [f32; MAX_REPS + 1] = [0.0; MAX_REPS + 1];
