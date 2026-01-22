@@ -184,5 +184,36 @@ fn test_format_workout_multiple_eblocks() {
     assert_eq!(bench_count, 1);
 }
 
+#[test]
+fn test_format_set_failed() {
+    let set = Set {
+        w: Some(247.208),
+        r: Some(0),
+        s: Some(1),
+        lb: Some(1.0),
+        rpe: Some(0.0),
+        c: Some(":'(".to_string()),
+        ..Default::default()
+    };
+    unsafe { std::env::set_var("WXRUST_COLOR", "never"); }
+    let formatted = format_set(&set);
+    // With user_wants_kg = true, 247.208 lbs -> kg ≈ 112
+    assert_eq!(formatted, "247 x 0 x 1 :'(");
+}
+
+#[test]
+fn test_format_workout_with_failed_sets() {
+    // JSON response from the user
+    let json = r#"{"data":{"jday":{"log":"deadlift\nEBLOCK:54709\n--\nx#chinup\nBW0 x 5 x 3\nx#barbell-landmine-row-narrow-grip\n135, 160, 180 x 10\nx#barbell-cheat-shrugs\n315, 365, 405, 455 x 10\nx#rack-pulls #dl\n135 x 10\n225,315, 405, 495 x 5","bw":92.5329,"eblocks":[{"eid":"54709","sets":[{"w":61.235,"r":10,"s":1,"lb":1,"rpe":0,"pr":0,"est1rm":76.12996754574426,"eff":0.30241052722331635,"int":0.2432431358840727,"type":0,"t":0,"d":0,"dunit":null,"speed":0,"force":null,"c":""},{"w":102.058,"r":5,"s":1,"lb":1,"rpe":0,"pr":0,"est1rm":111.77812555698762,"eff":0.44401545109567425,"int":0.40540390237701796,"type":0,"t":0,"d":0,"dunit":null,"speed":0,"force":null,"c":""},{"w":142.882,"r":3,"s":1,"lb":1,"rpe":0,"pr":0,"est1rm":149.37622549324806,"eff":0.5933661153723603,"int":0.567568641159273,"type":0,"t":0,"d":0,"dunit":null,"speed":0,"force":null,"c":"R"},{"w":183.705,"r":2,"s":1,"lb":1,"rpe":0,"pr":0,"est1rm":187.78725717488848,"eff":0.745945982624461,"int":0.7297294076522182,"type":0,"t":0,"d":0,"dunit":null,"speed":0,"force":null,"c":"L"},{"w":224.528,"r":1,"s":1,"lb":1,"rpe":0,"pr":0,"est1rm":224.5282440185547,"eff":0.8918919426752364,"int":0.8918901741451634,"type":0,"t":0,"d":0,"dunit":null,"speed":0,"force":null,"c":"R"},{"w":256.28,"r":0,"s":2,"lb":1,"rpe":0,"pr":0,"est1rm":250.82693409970983,"eff":0.9963580417569943,"int":1.0180183043091393,"type":0,"t":0,"d":0,"dunit":null,"speed":0,"force":null,"c":""},{"w":247.208,"r":0,"s":1,"lb":1,"rpe":0,"pr":0,"est1rm":241.94811356096886,"eff":0.9610887662430057,"int":0.9819816956908606,"type":0,"t":0,"d":0,"dunit":null,"speed":0,"force":null,"c":":'("},{"w":233.6,"r":1,"s":2,"lb":1,"rpe":0,"pr":0,"est1rm":233.60008239746094,"eff":0.9279279415793646,"int":0.9279267827634422,"type":0,"t":0,"d":0,"dunit":null,"speed":0,"force":null,"c":""},{"w":210.92,"r":5,"s":1,"lb":1,"rpe":0,"pr":0,"est1rm":231.00813506417816,"eff":0.9176319676697196,"int":0.837835261217745,"type":0,"t":0,"d":0,"dunit":null,"speed":0,"force":null,"c":""},{"w":170.097,"r":10,"s":1,"lb":1,"rpe":0,"pr":0,"est1rm":211.47213576019809,"eff":0.840029256939532,"int":0.6756744947247998,"type":0,"t":0,"d":0,"dunit":null,"speed":0,"force":null,"c":""}]}],"exercises":[{"exercise":{"id":"54709","name":"deadlift #dl","type":"DL"}}]}}} "#;
+    let response: wxrust::models::WorkoutResponse = serde_json::from_str(json).unwrap();
+    let jday = response.data.unwrap().jday.unwrap();
+    unsafe { std::env::set_var("WXRUST_COLOR", "never"); }
+    let formatted = format_workout("2023-02-01", &jday, false); // user_wants_kg = false, so show lbs
+    // Check that the failed set is formatted as "247 x 0 x 1 :'("
+    assert!(formatted.contains("545 x 0 x 1 :'("));
+    // And not "247 x 1 :'("
+    assert!(!formatted.contains("545 x 1 :'("));
+}
+
 
 

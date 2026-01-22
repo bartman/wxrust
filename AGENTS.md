@@ -185,6 +185,11 @@ The `table` command displays PR progression similar to the C implementation in `
 
 Unlike the C version which shows separate tables per filter, the Rust implementation combines all matching exercises into one table.
 
+## Recent Fixes
+
+- Fixed bug in set formatting for failed sets (r=0): now correctly shows "weight x 0 x sets comment" instead of "weight comment"
+- Fixed w_in_lbs to use set.lb for correct unit conversion in formatting
+
 ## Future Improvements
 
 - Add support for year/month range queries.
