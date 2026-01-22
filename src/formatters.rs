@@ -169,6 +169,17 @@ pub fn format_set(set: &Set) -> String {
 }
 
 #[allow(dead_code)]
+pub fn format_failed_set(w: f32, w_in_lbs: bool, usebw: i32, r: u32, s: u32, options: &FormatOptions) -> String {
+    let wbw = format_weight_with_bw(w, w_in_lbs, usebw, options);
+    let rxs = format!("{} x {} x {}", wbw, r, s);
+    if options.color_enabled {
+        Colour::RGB(255, 0, 0).paint(rxs).to_string()
+    } else {
+        rxs
+    }
+}
+
+#[allow(dead_code)]
 fn format_set_internal(set: &Set, options: &FormatOptions) -> String {
     let w = set.w.unwrap_or(0.0);
     let r = set.r.unwrap_or(0);
@@ -182,10 +193,12 @@ fn format_set_internal(set: &Set, options: &FormatOptions) -> String {
     if r > 0 {
         line += " x ";
         line += &color_reps_internal(&r.to_string(), options);
-    }
-    if s > 1 {
-        line += " x ";
-        line += &color_sets_internal(&s.to_string(), options);
+        if s > 1 {
+            line += " x ";
+            line += &color_sets_internal(&s.to_string(), options);
+        }
+    } else {
+        line = format_failed_set(w, w_in_lbs, usebw, r, s, options);
     }
     if rpe > 0.0 {
         line += &format!(" @{}", rpe);
