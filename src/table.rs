@@ -186,6 +186,7 @@ impl TableState {
 
                 self.records[old_index].date = date.to_string();
                 self.records[old_index].best_weight = weight;
+                self.records[old_index].best_1rm = ent_1rm;
 
             } else {
                 replacing_old_index = false;
@@ -261,8 +262,9 @@ pub fn process_workout(
             for set in &eblock.sets {
                 let weight = set.w.unwrap_or(0.0);
                 let reps = set.r.unwrap_or(0);
+                let sets = set.s.unwrap_or(0);
 
-                if weight > 0.0 && reps > 0 {
+                if weight > 0.0 && reps > 0 && sets > 0 {
                     state.process_set(date, &ex.name, jday.bw, weight, reps);
                 }
             }
