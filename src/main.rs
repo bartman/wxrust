@@ -162,9 +162,6 @@ struct HeatmapArgs {
     #[arg(long)]
     green: bool,
 
-    #[arg(long)]
-    solarized: bool,
-
     /// Arguments can be dates (YYYY, YYYY-MM, YYYY-MM-DD, etc.) or exercise filters
     /// Dates filter the date range, non-dates filter by exercise name (substring match)
     args: Vec<String>,
@@ -407,7 +404,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 heatmap_args.weight,
                 heatmap_args.onerm,
                 heatmap_args.green,
-                heatmap_args.solarized,
                 &heatmap_args.args,
                 args.verbose,
             ).await;

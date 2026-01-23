@@ -85,7 +85,6 @@ pub async fn handle_heatmap<C: ApiClient + Clone + Send + Sync + 'static>(
     weight: bool,
     onerm: bool,
     green: bool,
-    solarized: bool,
     args: &[String],
     verbose: bool,
 ) {
@@ -216,11 +215,21 @@ pub async fn handle_heatmap<C: ApiClient + Clone + Send + Sync + 'static>(
     let start_date = *date_list.first().unwrap();
     let end_date = *date_list.last().unwrap();
 
-    // Find max value
-    let max_value = daily_values.values().cloned().fold(0.0, f64::max);
+    // Find min and max values
+    let max_value = daily_values.values().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let min_value = daily_values.values().cloned().fold(f64::INFINITY, f64::min);
+
+    if verbose {
+        let msg = format!("Range: {} .. {} kg", min_value, max_value);
+        if *crate::formatters::STDERR_COLOR_ENABLED {
+            eprintln!("{}", ansi_term::Colour::Blue.paint(msg));
+        } else {
+            eprintln!("{}", msg);
+        }
+    }
 
     // Draw the heatmap
-    draw_heatmap(daily_values, start_date, end_date, max_value, green, solarized);
+    draw_heatmap(daily_values, start_date, end_date, min_value, max_value, green);
 }
 
 /// Draw the heatmap to the console.
@@ -228,9 +237,9 @@ fn draw_heatmap(
     daily_values: HashMap<NaiveDate, f64>,
     start_date: NaiveDate,
     end_date: NaiveDate,
+    min_value: f64,
     max_value: f64,
     green: bool,
-    solarized: bool,
 ) {
     let mut first_monday = start_date;
     while first_monday.weekday() != Weekday::Mon {
@@ -299,15 +308,16 @@ fn draw_heatmap(
             } else {
                 let symbol = match cell {
                     Some(value) if value > 0.0 => {
-                        let intensity = (value / max_value * 230.0) as u8 + 25;
+                        let range = max_value - min_value;
+                        let intensity = if range > 0.0 {
+                            ((value - min_value) / range * 230.0) as u8 + 25
+                        } else {
+                            128 // middle intensity if all values are the same
+                        };
                         if *crate::formatters::COLOR_ENABLED {
                             let color_code = if green {
                                 // Green gradient: RGB(0, intensity, 0)
                                 format!("\x1b[38;2;0;{};0m", intensity)
-                            } else if solarized {
-                                // Solarized: use table gradient colors
-                                let gradient_index = (intensity as usize * (crate::table::GRADIENT.len() - 1) / 255).min(crate::table::GRADIENT.len() - 1);
-                                format!("\x1b[38;5;{}m", crate::table::GRADIENT[gradient_index])
                             } else {
                                 // Default to solarized if neither specified
                                 let gradient_index = (intensity as usize * (crate::table::GRADIENT.len() - 1) / 255).min(crate::table::GRADIENT.len() - 1);
