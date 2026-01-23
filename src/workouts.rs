@@ -299,8 +299,19 @@ query GetJRange($uid: ID!, $ymd: YMD!, $range: Int!) {
 
         date_strings.sort();
 
+        let date_count_before = all_dates.len();
+
         let filtered = filter_dates_by_range(date_strings.clone(), oldest.as_deref(), latest.as_deref());
         all_dates.extend(filtered);
+
+        // Remove duplicates and sort
+        all_dates.sort();
+        all_dates.dedup();
+
+        let date_count_after = all_dates.len();
+        if date_count_before == date_count_after {
+            break;
+        }
 
         // Check if we have enough
         if count > 0 && all_dates.len() >= count as usize {
@@ -323,10 +334,6 @@ query GetJRange($uid: ID!, $ymd: YMD!, $range: Int!) {
             break;
         }
     }
-
-    // Remove duplicates and sort
-    all_dates.sort();
-    all_dates.dedup();
 
     let result = limit_and_sort_dates(all_dates, count, reverse);
     Ok(result)
