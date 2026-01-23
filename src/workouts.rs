@@ -352,6 +352,12 @@ pub async fn get_dates_from_ranges<C: crate::api::ApiClient>(
             Ok(start_end) => start_end,
             Err(e) => return Err(format!("Invalid date range '{}': {}", range_str, e)),
         };
+
+        // don't ask for dates in the future
+        let now = Utc::now().date_naive();
+        let latest = if latest > now { now } else { latest };
+
+        // limit the query to the number of days in the range
         let count = ((oldest - latest).num_days().abs() + 1) as u32;
         let dates = match get_dates(data_access, Some(latest.to_string()), Some(oldest.to_string()), count, false).await {
             Ok(d) => d,
