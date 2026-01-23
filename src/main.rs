@@ -144,19 +144,19 @@ struct TableArgs {
 
 #[derive(Parser)]
 struct HeatmapArgs {
-    #[arg(long)]
+    #[arg(long, group = "metric")]
     sets: bool,
 
-    #[arg(long)]
+    #[arg(long, group = "metric")]
     reps: bool,
 
-    #[arg(long)]
+    #[arg(long, group = "metric")]
     volume: bool,
 
-    #[arg(long)]
+    #[arg(long, group = "metric")]
     weight: bool,
 
-    #[arg(long)]
+    #[arg(long, group = "metric")]
     onerm: bool,
 
     #[arg(long)]
@@ -394,15 +394,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             table::handle_table(&client, &token, data_access, &table_args.args, args.verbose).await;
         },
         Commands::Heatmap(heatmap_args) => {
+            // Determine metric - default to OneRm
+            let metric = if heatmap_args.sets {
+                heatmap::Metric::Sets
+            } else if heatmap_args.reps {
+                heatmap::Metric::Reps
+            } else if heatmap_args.volume {
+                heatmap::Metric::Volume
+            } else if heatmap_args.weight {
+                heatmap::Metric::Weight
+            } else if heatmap_args.onerm {
+                heatmap::Metric::OneRm
+            } else {
+                heatmap::Metric::OneRm // default
+            };
+
             heatmap::handle_heatmap(
                 &client,
                 &token,
                 data_access,
-                heatmap_args.sets,
-                heatmap_args.reps,
-                heatmap_args.volume,
-                heatmap_args.weight,
-                heatmap_args.onerm,
+                metric,
                 heatmap_args.green,
                 &heatmap_args.args,
                 args.verbose,

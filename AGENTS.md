@@ -14,6 +14,7 @@ decodes the JWT token for user ID, queries the GraphQL API for workout data, and
 - write unit tests for new functions; put unit tests into `tests/test_*.rs`
 - update README.md when new features are added
 - update AGENTS.md when you discover new information that is useful to future agents
+- use `--no-network` when testing commands that fetch data to avoid unnecessary network requests
 
 ## Key Learnings
 
@@ -79,7 +80,7 @@ You can look in `weightxreps-client/src/data/generated---db-types-and-hooks.tsx`
 - Data access control options: `--force-authentication`, `--no-network`, `--no-cache`, `--no-cache-write` for flexible offline/online operation modes
 - Unit-aware parsing: Parser uses cached user unit preference (`user_wants_kg`) to correctly interpret weights without explicit units when reading from cache or importing files, preventing 2.2x multiplier errors in offline mode
  - Table command for PR progression: Displays personal records over time with 1RM calculations (Brzycki formula), date/exercise filtering, age-based color gradient (256-color ANSI), projected weights for rep ranges 1-10, deterministic processing in chronological order, and deduplication of same-day same-rep PRs (keeps only the best weight per day per rep count)
- - Heatmap command: Displays calendar heatmap of workout intensity with selectable metrics (--sets, --reps, --volume, --weight, --1rm), date/exercise filtering, color scheme options (--green for RGB green gradient, --solarized for table-style gradient, defaulting to solarized), symbol gradients for no-color mode, adapted from clinvoice-rs heatmap implementation
+ - Heatmap command: Displays calendar heatmap of workout intensity with mutually exclusive metric options (--sets, --reps, --volume, --weight, --onerm; default: onerm), date/exercise filtering, color scheme options (--green for RGB green gradient, defaulting to solarized table-style gradient), symbol gradients for no-color mode, adapted from clinvoice-rs heatmap implementation
 
 ## Dependencies Added
 

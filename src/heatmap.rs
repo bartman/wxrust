@@ -79,29 +79,11 @@ pub async fn handle_heatmap<C: ApiClient + Clone + Send + Sync + 'static>(
     client: &C,
     token: &Option<String>,
     data_access: DataAccess<'_, C>,
-    sets: bool,
-    reps: bool,
-    volume: bool,
-    weight: bool,
-    onerm: bool,
+    metric: Metric,
     green: bool,
     args: &[String],
     verbose: bool,
 ) {
-    // Determine metric - default to OneRm
-    let metric = if sets {
-        Metric::Sets
-    } else if reps {
-        Metric::Reps
-    } else if volume {
-        Metric::Volume
-    } else if weight {
-        Metric::Weight
-    } else if onerm {
-        Metric::OneRm
-    } else {
-        Metric::OneRm // default
-    };
 
     // Parse arguments into dates and exercise filters
     let (date_args, filters) = parse_date_and_filter_arguments(args);
@@ -319,7 +301,7 @@ fn draw_heatmap(
                                 // Green gradient: RGB(0, intensity, 0)
                                 format!("\x1b[38;2;0;{};0m", intensity)
                             } else {
-                                // Default to solarized if neither specified
+                                // Solarized: use table gradient colors (default)
                                 let gradient_index = (intensity as usize * (crate::table::GRADIENT.len() - 1) / 255).min(crate::table::GRADIENT.len() - 1);
                                 format!("\x1b[38;5;{}m", crate::table::GRADIENT[gradient_index])
                             };
