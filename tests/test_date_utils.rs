@@ -155,6 +155,14 @@ fn test_parse_date_range_year_range() {
 }
 
 #[test]
+fn test_parse_date_range_open_end() {
+    let today = chrono::Utc::now().date_naive();
+    let (start, end) = parse_date_range("2025..").unwrap();
+    assert_eq!(start, NaiveDate::from_ymd_opt(2025, 1, 1).unwrap());
+    assert_eq!(end, today);
+}
+
+#[test]
 fn test_parse_date_range_invalid() {
     // Invalid date
     assert!(parse_date_range("invalid").is_err());

@@ -13,7 +13,12 @@ pub fn parse_date_range(range: &str) -> Result<(NaiveDate, NaiveDate), String> {
         Ok((start, end))
     } else if parts.len() == 2 {
         let start = parse_date_boundary(parts[0], false)?;
-        let end = parse_date_boundary(parts[1], true)?;
+        let end = if parts[1].is_empty() {
+            // "start.." means from start to today
+            chrono::Utc::now().date_naive()
+        } else {
+            parse_date_boundary(parts[1], true)?
+        };
         Ok((start, end))
     } else {
         Err("Invalid range format".to_string())
