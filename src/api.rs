@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
-use serde_json;
 use ansi_term::Colour;
 use tokio::sync::OnceCell;
 
@@ -40,12 +39,10 @@ fn log_verbose_response(text: &str, status: reqwest::StatusCode, verbose: bool) 
             } else {
                 text.to_string()
             }
+        } else if *STDERR_COLOR_ENABLED {
+            Colour::Red.paint(text).to_string()
         } else {
-            if *STDERR_COLOR_ENABLED {
-                Colour::Red.paint(text).to_string()
-            } else {
-                text.to_string()
-            }
+            text.to_string()
         };
         eprintln!("{}", colored);
     }
@@ -132,12 +129,11 @@ impl ApiClient for ReqwestClient {
             // Default to kg if not available
             if let Some(data) = response.data {
                 let mut usekg = 1;
-                if let Some(session) = data.get_session {
-                    if let Some(val) = session.user.usekg {
+                if let Some(session) = data.get_session
+                    && let Some(val) = session.user.usekg {
                         write_cached_user_wants_kg(val != 0);
                         usekg = val;
                     }
-                }
                 Ok(User { usekg: Some(usekg) })
             } else {
                 Err("No data in response".into())

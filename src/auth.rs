@@ -21,9 +21,9 @@ struct CachedToken {
 
 pub async fn login<C: crate::api::ApiClient>(client: &C, credentials_path: &str, token_path: &str, force_auth: bool) -> Result<String, String> {
     // Check if token file exists and is valid (unless force_auth is true)
-    if !force_auth {
-        if let Ok(contents) = fs::read_to_string(token_path) {
-            if let Ok(cached) = serde_json::from_str::<CachedToken>(&contents) {
+    if !force_auth
+        && let Ok(contents) = fs::read_to_string(token_path)
+            && let Ok(cached) = serde_json::from_str::<CachedToken>(&contents) {
                 let now = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap()
@@ -32,8 +32,6 @@ pub async fn login<C: crate::api::ApiClient>(client: &C, credentials_path: &str,
                     return Ok(cached.token);
                 }
             }
-        }
-    }
 
     // Perform login
     let credentials = fs::read_to_string(credentials_path).map_err(|_| format!("{} not found. Please create it with email on first line and password on second.", credentials_path))?;

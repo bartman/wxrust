@@ -36,11 +36,10 @@ pub fn parse_bw_line(lines: &[&str], i: &mut usize) -> Result<Option<f32>, Strin
     let line = lines[*i];
     if let Some(caps) = BW_REGEX.captures(line.trim()) {
         let mut lb_to_kg = false;
-        if let Some(unit_match) = caps.get(2) {
-            if unit_match.as_str() == "lbs" {
+        if let Some(unit_match) = caps.get(2)
+            && unit_match.as_str() == "lbs" {
                 lb_to_kg = true;
-            }
-        };
+            };
         if let Some(num_match) = caps.get(1) {
             let bw_val: f32 = num_match.as_str().parse().map_err(|_| format!("Line {}: Invalid bw number: {}", *i + 1, num_match.as_str()))?;
             let bw = if lb_to_kg {
@@ -181,7 +180,7 @@ pub fn parse_workout_with_options(text: &str, options: &ParserOptions) -> Result
 //   405, 406 x 2 cccc - ( Set { w=405, r=2, s=1, c="" }, Set { w=406, r=2, s=1, c="cccc" } )
 
 pub fn is_weight_part(s: &str) -> bool {
-    s.chars().all(|c| c.is_digit(10) || c == ',' || c == '.' || c == '+' || c == '-') || s.to_lowercase().starts_with("bw") || s.to_lowercase().contains("kg") || s.to_lowercase().contains("lb") || s.to_lowercase().contains("lbs")
+    s.chars().all(|c| c.is_ascii_digit() || c == ',' || c == '.' || c == '+' || c == '-') || s.to_lowercase().starts_with("bw") || s.to_lowercase().contains("kg") || s.to_lowercase().contains("lb") || s.to_lowercase().contains("lbs")
 }
 
 pub fn parse_weight(s: &str) -> Result<(f32, bool, i32), String> {
@@ -209,7 +208,7 @@ pub fn parse_weight(s: &str) -> Result<(f32, bool, i32), String> {
         Ok((v, false, usebw))
     } else {
         let mut lb = false;
-        let num_end = s.find(|c: char| !c.is_digit(10) && c != '.');
+        let num_end = s.find(|c: char| !c.is_ascii_digit() && c != '.');
         let num_str = if let Some(end) = num_end { &s[..end] } else { s };
         let unit = if let Some(end) = num_end { &s[end..].trim().to_lowercase() } else { "" };
         if unit == "lb" || unit == "lbs" {
@@ -245,7 +244,7 @@ pub fn parse_reps_and_comment(s: &str) -> Result<(Vec<u32>, Option<String>), Str
         }
         // Parse number
         let start = i;
-        while i < chars.len() && chars[i].is_digit(10) {
+        while i < chars.len() && chars[i].is_ascii_digit() {
             i += 1;
         }
         if start == i {
@@ -358,8 +357,8 @@ pub fn parse_set_line_with_options(line: &str, options: &ParserOptions) -> Resul
     // Parse RPE from comment
     let mut rpe = None;
     let mut final_comment = comment.clone();
-    if let Some(c) = &comment {
-        if c.trim().starts_with('@') {
+    if let Some(c) = &comment
+        && c.trim().starts_with('@') {
             let trimmed = c.trim();
             let after_at = &trimmed[1..];
             let rpe_part_end = after_at.find(' ').unwrap_or(after_at.len());
@@ -371,7 +370,6 @@ pub fn parse_set_line_with_options(line: &str, options: &ParserOptions) -> Resul
                 final_comment = if rest.is_empty() { None } else { Some(rest.to_string()) };
             }
         }
-    }
     // Determine lb if any weights have lbs units
     // When user_wants_kg is false, weights without explicit units are in lbs
     let weights_without_unit_are_lbs = !options.user_wants_kg;

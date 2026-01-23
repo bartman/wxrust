@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use lazy_static::lazy_static;
 use ansi_term::Colour;
 use crate::parsers::LBS_PER_KG;
-use atty;
 
 //use crate::models::{JDay, Set, Exercise, EBlock, User};
 use crate::models::{JDay, Set, Exercise, EBlock};
@@ -203,11 +202,10 @@ fn format_set_internal(set: &Set, options: &FormatOptions) -> String {
     if rpe > 0.0 {
         line += &format!(" @{}", rpe);
     }
-    if let Some(c) = &set.c {
-        if !c.is_empty() {
+    if let Some(c) = &set.c
+        && !c.is_empty() {
             line += &format!(" {}", c);
         }
-    }
     line
 }
 
@@ -351,8 +349,8 @@ fn format_workout_internal(date: &str, jday: &JDay, options: &FormatOptions) -> 
         result = result.replace(&placeholder, &formatted);
     }
     let mut output = vec![color_date_internal(date, options)];
-     if let Some(bw) = jday.bw {
-         if bw > 0.0 {
+     if let Some(bw) = jday.bw
+         && bw > 0.0 {
              let num = if options.user_wants_kg { bw } else { bw * LBS_PER_KG };
              let unit_str = if options.user_wants_kg { "kg" } else { "lbs" };
              let bwtxt = if options.show_unit_name {
@@ -362,7 +360,6 @@ fn format_workout_internal(date: &str, jday: &JDay, options: &FormatOptions) -> 
              };
              output.push(format!("@ {} bw", color_bw_internal(&bwtxt, options)));
          }
-     }
     output.push(result);
     output.join("\n")
 }

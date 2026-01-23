@@ -54,7 +54,7 @@ pub fn parse_date_boundary(s: &str, end: bool) -> Result<NaiveDate, String> {
         (parts[0].to_string(), parts[1].to_string(), "".to_string())
     } else if parts.len() == 3 {
         (parts[0].to_string(), parts[1].to_string(), parts[2].to_string())
-    } else if parts.len() == 0 {
+    } else if parts.is_empty() {
         return Err("Empty date string".to_string());
     } else {
         return Err("Too many parts".to_string());

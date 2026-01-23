@@ -61,7 +61,7 @@ async fn setup_auth_and_data_access(
 ) -> (Option<String>, Option<u32>) {
     let (token, uid) = if no_network {
         // Load uid from cached token, no network login
-        let uid = match auth::load_uid_from_cache(&token_path) {
+        let uid = match auth::load_uid_from_cache(token_path) {
             Ok(u) => u,
             Err(e) => {
                 eprintln!("Failed to load cached token: {}", e);
@@ -282,7 +282,7 @@ async fn handle_show(
             Ok(d) => d,
             Err(e) => utils::exit_with_error(e),
         };
-        if let Some(d) = dates.get(0) {
+        if let Some(d) = dates.first() {
             d.clone()
         } else {
             utils::exit_with_error("No workouts found");

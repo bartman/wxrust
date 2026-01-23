@@ -176,14 +176,13 @@ pub async fn handle_heatmap<C: ApiClient + Clone + Send + Sync + 'static>(
     // Compute daily metrics
     let mut daily_values: HashMap<NaiveDate, f64> = HashMap::new();
     for (date_str, jday_opt) in results {
-        if let Some(jday) = jday_opt {
-            if let Ok(date) = NaiveDate::parse_from_str(&date_str, "%Y-%m-%d") {
+        if let Some(jday) = jday_opt
+            && let Ok(date) = NaiveDate::parse_from_str(&date_str, "%Y-%m-%d") {
                 let value = compute_metric(&jday, metric, &filters);
                 if value > 0.0 {
                     daily_values.insert(date, value);
                 }
             }
-        }
     }
 
     if daily_values.is_empty() {

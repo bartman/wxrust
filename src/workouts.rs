@@ -14,8 +14,8 @@ lazy_static! {
 
 fn filter_dates_by_range(dates: Vec<String>, oldest: Option<&str>, latest: Option<&str>) -> Vec<String> {
     dates.into_iter()
-        .filter(|d| oldest.map_or(true, |old| d.as_str() >= old))
-        .filter(|d| latest.map_or(true, |lat| d.as_str() <= lat))
+        .filter(|d| oldest.is_none_or(|old| d.as_str() >= old))
+        .filter(|d| latest.is_none_or(|lat| d.as_str() <= lat))
         .collect()
 }
 
@@ -118,20 +118,16 @@ pub fn get_dates_from_cache(uid: u32, latest: Option<String>, oldest: Option<Str
     for entry in entries {
         let entry = entry.map_err(|e| format!("Failed to read dir entry: {}", e))?;
         let path = entry.path();
-        if path.is_file() {
-            if let Some(ext) = path.extension() {
-                if ext == "txt" {
-                    if let Some(stem) = path.file_stem() {
-                        if let Some(date_str) = stem.to_str() {
+        if path.is_file()
+            && let Some(ext) = path.extension()
+                && ext == "txt"
+                    && let Some(stem) = path.file_stem()
+                        && let Some(date_str) = stem.to_str() {
                             // Basic validation: should be YYYY-MM-DD format
                             if date_str.len() == 10 && date_str.chars().nth(4) == Some('-') && date_str.chars().nth(7) == Some('-') {
                                 dates.push(date_str.to_string());
                             }
                         }
-                    }
-                }
-            }
-        }
     }
 
     // Sort dates
@@ -144,9 +140,9 @@ pub fn get_dates_from_cache(uid: u32, latest: Option<String>, oldest: Option<Str
 }
 
 pub fn lookup_cached_jday(uid: u32, date: &str, verbose: bool) -> Option<models::JDay> {
-    if let Ok(cache_path) = get_cache_file_path(uid, date) {
-        if cache_path.exists() {
-            if let Ok(content) = fs::read_to_string(&cache_path) {
+    if let Ok(cache_path) = get_cache_file_path(uid, date)
+        && cache_path.exists()
+            && let Ok(content) = fs::read_to_string(&cache_path) {
                 // Use cached user preference to parse the cached workout
                 let user_wants_kg = read_cached_user_wants_kg_or(true);
                 let options = parsers::ParserOptions::new(user_wants_kg);
@@ -161,8 +157,6 @@ pub fn lookup_cached_jday(uid: u32, date: &str, verbose: bool) -> Option<models:
                     eprintln!("\x1b[34mfailed parsing {} from cache {}\x1b[0m", date, cache_path.display());
                 }
             }
-        }
-    }
     None
 }
 
@@ -187,11 +181,10 @@ pub async fn get_jday<C: crate::api::ApiClient>(data_access: &crate::api::DataAc
     let client = data_access.client;
 
     // Check cache if allowed
-    if data_access.use_cache {
-        if let Some(jday) = lookup_cached_jday(uid, date, verbose) {
+    if data_access.use_cache
+        && let Some(jday) = lookup_cached_jday(uid, date, verbose) {
             return Ok(jday);
         }
-    }
 
     if !data_access.use_network {
         return Err(format!("No workout found for {} (network access disabled)", date));
@@ -319,13 +312,11 @@ query GetJRange($uid: ID!, $ymd: YMD!, $range: Int!) {
         }
 
         // Check if we reached the oldest
-        if let Some(old) = &oldest {
-            if let Some(batch_oldest) = date_strings.first() {
-                if batch_oldest < old {
+        if let Some(old) = &oldest
+            && let Some(batch_oldest) = date_strings.first()
+                && batch_oldest < old {
                     break;
                 }
-            }
-        }
 
         // Set next ymd to the oldest in this batch to get older dates
         if let Some(oldest_in_batch) = date_strings.first() {

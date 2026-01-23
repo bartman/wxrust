@@ -45,13 +45,11 @@ pub async fn fetch_command(
                 let workout = formatters::format_workout(date, &server_jday, user_wants_kg);
                 print!("{}", workout);
             }
+        } else if !force && workouts::lookup_cached_jday(uid, date, verbose).is_some() {
+            pb.println(format!("{} already cached, skipping", date));
         } else {
-            if !force && workouts::lookup_cached_jday(uid, date, verbose).is_some() {
-                pb.println(format!("{} already cached, skipping", date));
-            } else {
-                let jday = workouts::get_jday(data_access, date, verbose).await?;
-                workouts::write_cached_jday(uid, date, &jday);
-            }
+            let jday = workouts::get_jday(data_access, date, verbose).await?;
+            workouts::write_cached_jday(uid, date, &jday);
         }
 
         pb.inc(1);
