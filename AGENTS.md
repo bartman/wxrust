@@ -78,7 +78,8 @@ You can look in `weightxreps-client/src/data/generated---db-types-and-hooks.tsx`
 - Robust workout parsing that treats invalid exercise blocks (lone # or #exercise with no valid sets) as comments
 - Data access control options: `--force-authentication`, `--no-network`, `--no-cache`, `--no-cache-write` for flexible offline/online operation modes
 - Unit-aware parsing: Parser uses cached user unit preference (`user_wants_kg`) to correctly interpret weights without explicit units when reading from cache or importing files, preventing 2.2x multiplier errors in offline mode
-- Table command for PR progression: Displays personal records over time with 1RM calculations (Brzycki formula), date/exercise filtering, age-based color gradient (256-color ANSI), projected weights for rep ranges 1-10, deterministic processing in chronological order, and deduplication of same-day same-rep PRs (keeps only the best weight per day per rep count)
+ - Table command for PR progression: Displays personal records over time with 1RM calculations (Brzycki formula), date/exercise filtering, age-based color gradient (256-color ANSI), projected weights for rep ranges 1-10, deterministic processing in chronological order, and deduplication of same-day same-rep PRs (keeps only the best weight per day per rep count)
+ - Heatmap command: Displays calendar heatmap of workout intensity with selectable metrics (--sets, --reps, --volume, --weight, --1rm), date/exercise filtering, green color gradient for intensity, symbol gradients for no-color mode, adapted from clinvoice-rs heatmap implementation
 
 ## Dependencies Added
 

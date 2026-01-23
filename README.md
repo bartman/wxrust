@@ -103,7 +103,22 @@ The table shows:
 - Exercise name and estimated 1RM (Brzycki formula)
 - Projected weights for rep ranges 1-10
 - Color gradient from oldest (cool colors) to newest (warm colors)
-- Records within 7 days highlighted in bright yellow
+ - Records within 7 days highlighted in bright yellow
+
+#### Heatmap Command
+
+Display a calendar heatmap showing workout intensity over time.
+
+- Show 1RM heatmap: `wxrust heatmap`
+- Show sets heatmap: `wxrust heatmap --sets`
+- Show reps heatmap: `wxrust heatmap --reps`
+- Show volume heatmap: `wxrust heatmap --volume`
+- Show weight heatmap: `wxrust heatmap --weight`
+- Filter by date range: `wxrust heatmap 2025`
+- Filter by exercise: `wxrust heatmap deadlift`
+- Combine filters: `wxrust heatmap 2025 deadlift --sets`
+
+The heatmap displays a calendar grid with days colored by intensity (green gradient). Days without workouts are gray. Without color support, uses symbol gradients.
 
 ### Examples
 
