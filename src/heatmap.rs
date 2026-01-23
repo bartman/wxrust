@@ -84,6 +84,8 @@ pub async fn handle_heatmap<C: ApiClient + Clone + Send + Sync + 'static>(
     volume: bool,
     weight: bool,
     onerm: bool,
+    green: bool,
+    solarized: bool,
     args: &[String],
     verbose: bool,
 ) {
@@ -218,7 +220,7 @@ pub async fn handle_heatmap<C: ApiClient + Clone + Send + Sync + 'static>(
     let max_value = daily_values.values().cloned().fold(0.0, f64::max);
 
     // Draw the heatmap
-    draw_heatmap(daily_values, start_date, end_date, max_value);
+    draw_heatmap(daily_values, start_date, end_date, max_value, green, solarized);
 }
 
 /// Draw the heatmap to the console.
@@ -227,6 +229,8 @@ fn draw_heatmap(
     start_date: NaiveDate,
     end_date: NaiveDate,
     max_value: f64,
+    green: bool,
+    solarized: bool,
 ) {
     let mut first_monday = start_date;
     while first_monday.weekday() != Weekday::Mon {
@@ -297,7 +301,19 @@ fn draw_heatmap(
                     Some(value) if value > 0.0 => {
                         let intensity = (value / max_value * 230.0) as u8 + 25;
                         if *crate::formatters::COLOR_ENABLED {
-                            format!("\x1b[38;2;0;{};0m ◀▶\x1b[0m", intensity)
+                            let color_code = if green {
+                                // Green gradient: RGB(0, intensity, 0)
+                                format!("\x1b[38;2;0;{};0m", intensity)
+                            } else if solarized {
+                                // Solarized: use table gradient colors
+                                let gradient_index = (intensity as usize * (crate::table::GRADIENT.len() - 1) / 255).min(crate::table::GRADIENT.len() - 1);
+                                format!("\x1b[38;5;{}m", crate::table::GRADIENT[gradient_index])
+                            } else {
+                                // Default to solarized if neither specified
+                                let gradient_index = (intensity as usize * (crate::table::GRADIENT.len() - 1) / 255).min(crate::table::GRADIENT.len() - 1);
+                                format!("\x1b[38;5;{}m", crate::table::GRADIENT[gradient_index])
+                            };
+                            format!("{} ◀▶\x1b[0m", color_code)
                         } else {
                             // Map to 4 levels
                             let level = ((value / max_value * 3.0) as usize).min(3);
