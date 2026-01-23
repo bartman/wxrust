@@ -7,6 +7,7 @@ mod utils;
 mod parsers;
 mod fetch;
 mod table;
+mod heatmap;
 
 use clap::{Parser, Subcommand};
 
@@ -48,6 +49,7 @@ enum Commands {
     Show(ShowArgs),
     Fetch(FetchArgs),
     Table(TableArgs),
+    Heatmap(HeatmapArgs),
 }
 
 async fn setup_auth_and_data_access(
@@ -135,6 +137,28 @@ struct FetchArgs {
 
 #[derive(Parser)]
 struct TableArgs {
+    /// Arguments can be dates (YYYY, YYYY-MM, YYYY-MM-DD, etc.) or exercise filters
+    /// Dates filter the date range, non-dates filter by exercise name (substring match)
+    args: Vec<String>,
+}
+
+#[derive(Parser)]
+struct HeatmapArgs {
+    #[arg(long)]
+    sets: bool,
+
+    #[arg(long)]
+    reps: bool,
+
+    #[arg(long)]
+    volume: bool,
+
+    #[arg(long)]
+    weight: bool,
+
+    #[arg(long)]
+    onerm: bool,
+
     /// Arguments can be dates (YYYY, YYYY-MM, YYYY-MM-DD, etc.) or exercise filters
     /// Dates filter the date range, non-dates filter by exercise name (substring match)
     args: Vec<String>,
@@ -365,6 +389,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         Commands::Table(table_args) => {
             table::handle_table(&client, &token, data_access, &table_args.args, args.verbose).await;
+        },
+        Commands::Heatmap(heatmap_args) => {
+            heatmap::handle_heatmap(
+                &client,
+                &token,
+                data_access,
+                heatmap_args.sets,
+                heatmap_args.reps,
+                heatmap_args.volume,
+                heatmap_args.weight,
+                heatmap_args.onerm,
+                &heatmap_args.args,
+                args.verbose,
+            ).await;
         }
     }
 

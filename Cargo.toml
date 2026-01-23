@@ -24,8 +24,10 @@ atty = "0.2"
 lazy_static = "1.4"
 async-trait = "0.1"
 dirs = "5.0"
-indicatif = "0.18.3"
-similar = "2.7.0"
+ indicatif = "0.18.3"
+ similar = "2.7.0"
+ term_size = "0.3"
+ num-traits = "0.2"
 
 [dev-dependencies]
 mockall = "0.12"

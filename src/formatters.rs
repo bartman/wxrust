@@ -46,7 +46,7 @@ impl FormatOptions {
 }
 
 lazy_static! {
-    static ref COLOR_ENABLED: bool = {
+    pub static ref COLOR_ENABLED: bool = {
         let color_arg = std::env::var("WXRUST_COLOR").unwrap_or("auto".to_string());
         match color_arg.as_str() {
             "always" => true,

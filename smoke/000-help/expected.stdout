@@ -6,6 +6,7 @@ Commands:
   list   
   show   
   fetch  
+  heatmap
   table  
   help   Print this message or the help of the given subcommand(s)
 

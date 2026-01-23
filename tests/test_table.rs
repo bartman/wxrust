@@ -125,7 +125,7 @@ fn test_parse_arguments_mixed() {
         "squat".to_string(),
     ];
 
-    let (dates, filters) = parse_arguments(&args);
+    let (dates, filters) = wxrust::table::parse_date_and_filter_arguments(&args);
 
     assert_eq!(dates, vec!["2025", "2025-06"]);
     assert_eq!(filters, vec!["deadlift", "squat"]);
@@ -139,7 +139,7 @@ fn test_parse_arguments_only_dates() {
         "2025-01-15".to_string(),
     ];
 
-    let (dates, filters) = parse_arguments(&args);
+    let (dates, filters) = wxrust::table::parse_date_and_filter_arguments(&args);
 
     assert_eq!(dates.len(), 3);
     assert!(filters.is_empty());
@@ -153,7 +153,7 @@ fn test_parse_arguments_only_filters() {
         "bench".to_string(),
     ];
 
-    let (dates, filters) = parse_arguments(&args);
+    let (dates, filters) = wxrust::table::parse_date_and_filter_arguments(&args);
 
     assert!(dates.is_empty());
     assert_eq!(filters.len(), 3);
@@ -163,7 +163,7 @@ fn test_parse_arguments_only_filters() {
 fn test_parse_arguments_empty() {
     let args: Vec<String> = vec![];
 
-    let (dates, filters) = parse_arguments(&args);
+    let (dates, filters) = wxrust::table::parse_date_and_filter_arguments(&args);
 
     assert!(dates.is_empty());
     assert!(filters.is_empty());

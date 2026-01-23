@@ -98,7 +98,7 @@ pub fn is_date_arg(s: &str) -> bool {
 
 /// Parse arguments into (dates, exercise_filters)
 /// Dates are arguments that look like dates, everything else is an exercise filter
-pub fn parse_arguments(args: &[String]) -> (Vec<String>, Vec<String>) {
+pub fn parse_date_and_filter_arguments(args: &[String]) -> (Vec<String>, Vec<String>) {
     let mut dates = Vec::new();
     let mut filters = Vec::new();
 
@@ -487,7 +487,7 @@ pub async fn handle_table<C: ApiClient + Clone + Send + Sync + 'static>(
     verbose: bool,
 ) {
     // Parse arguments into dates and exercise filters
-    let (date_args, filters) = parse_arguments(args);
+    let (date_args, filters) = parse_date_and_filter_arguments(args);
 
     if verbose {
         let msg = format!("Date args: {:?}, Filters: {:?}", date_args, filters);
@@ -654,7 +654,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_arguments() {
+    fn test_parse_date_and_filter_arguments() {
         let args: Vec<String> = vec![
             "2025".to_string(),
             "deadlift".to_string(),
@@ -662,7 +662,7 @@ mod tests {
             "squat".to_string(),
         ];
 
-        let (dates, filters) = parse_arguments(&args);
+        let (dates, filters) = parse_date_and_filter_arguments(&args);
 
         assert_eq!(dates, vec!["2025", "2025-06"]);
         assert_eq!(filters, vec!["deadlift", "squat"]);

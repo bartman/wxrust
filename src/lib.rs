@@ -8,3 +8,4 @@ pub mod credentials;
 pub mod parsers;
 pub mod fetch;
 pub mod table;
+pub mod heatmap;
