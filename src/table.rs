@@ -453,7 +453,14 @@ pub fn format_table(state: &TableState, filters: &[String], user_wants_kg: bool)
         width = 36 + lift_width,
     ));
     for rep in 1..=MAX_REPS {
-        let colrep = fg_256(best_col[rep]);
+        let mut best = true;
+        for after in rep+1..MAX_REPS {
+            if best_lifted[rep] <= best_lifted[after] {
+                best = false;
+                break;
+            }
+        }
+        let colrep = if best { fg_256(best_col[rep]) } else { fg_256(BRIGHT_BLACK) };
         let reset = col_reset();
         output.push_str(&format!(" {}{:3.0}{} |", colrep, best_lifted[rep], reset));
     }
