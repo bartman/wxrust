@@ -418,3 +418,38 @@ fn test_format_table_best_weight_row() {
 
     assert!(output.contains("best weight lifted"));
 }
+
+#[test]
+fn test_gradient_color() {
+    // Recent records get bright yellow
+    assert_eq!(get_gradient_color(100, 100, 5), BRIGHT_YELLOW);
+
+    // Older records use gradient
+    let col = get_gradient_color(0, 100, 100);
+    assert_eq!(col, GRADIENT[0]);
+
+    let col = get_gradient_color(99, 100, 100);
+    assert_eq!(col, GRADIENT[GRADIENT.len() - 1]);
+}
+
+#[test]
+fn test_table_state_process_set() {
+    let mut state = TableState::new();
+
+    // First set - should create a record
+    state.process_set("2025-01-01", "Deadlift", Some(80.0), 100.0, 5);
+    assert_eq!(state.records.len(), 1);
+    assert_eq!(state.max_lift_width, 8);
+
+    // Same weight/reps but different date - not a PR
+    state.process_set("2025-01-02", "Deadlift", Some(80.0), 100.0, 5);
+    assert_eq!(state.records.len(), 1);
+
+    // Better 1RM for same rep range - should create a record
+    state.process_set("2025-01-03", "Deadlift", Some(80.0), 110.0, 5);
+    assert_eq!(state.records.len(), 2);
+
+    // Different rep range - should create a record
+    state.process_set("2025-01-04", "Deadlift", Some(80.0), 120.0, 3);
+    assert_eq!(state.records.len(), 3);
+}

@@ -17,14 +17,14 @@ const MAX_REPS: usize = 10;
 
 /// Color gradient for age-based coloring (256-color ANSI codes)
 /// From oldest (cool colors) to newest (warm colors)
-const GRADIENT: [u8; 20] = [
+pub const GRADIENT: [u8; 20] = [
     0x23, 0x24, 0x25, 0x20, 0x21, 0x3f, 0x39, 0x5d,
     0x81, 0xa5, 0xc9, 0xc8, 0xc7, 0xc6, 0xc5, 0xc4,
     0xca, 0xd0, 0xd6, 0xdc,
 ];
 
 /// Bright yellow for recent records (within 7 days)
-const BRIGHT_YELLOW: u8 = 11;
+pub const BRIGHT_YELLOW: u8 = 11;
 /// Bright black (gray) for dimmed text
 const BRIGHT_BLACK: u8 = 8;
 
@@ -226,7 +226,7 @@ impl Default for TableState {
 // ============================================================================
 
 /// Check if an exercise name matches any of the filters (case-insensitive substring match)
-fn matches_any_filter(exercise_name: &str, filters: &[String]) -> bool {
+pub fn matches_any_filter(exercise_name: &str, filters: &[String]) -> bool {
     if filters.is_empty() {
         return true; // No filters = match all
     }
@@ -304,7 +304,7 @@ fn col_reset() -> &'static str {
 }
 
 /// Calculate color index based on days since start and total days
-fn get_gradient_color(days_since_start: i64, total_days: i64, days_ago: i64) -> u8 {
+pub fn get_gradient_color(days_since_start: i64, total_days: i64, days_ago: i64) -> u8 {
     // Recent records (within 7 days) get bright yellow
     if days_ago <= 7 {
         return BRIGHT_YELLOW;
@@ -588,132 +588,3 @@ pub async fn handle_table<C: ApiClient + Clone + Send + Sync + 'static>(
     print!("{}", output);
 }
 
-// ============================================================================
-// Unit Tests
-// ============================================================================
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_calculate_1rm() {
-        // 1RM of a single = weight
-        assert_eq!(calculate_1rm(100.0, 1), 100.0);
-
-        // Brzycki: 100 * (36 / (37 - 5)) = 100 * (36/32) = 112.5
-        let result = calculate_1rm(100.0, 5);
-        assert!((result - 112.5).abs() < 0.1);
-
-        // Edge cases
-        assert_eq!(calculate_1rm(0.0, 5), 0.0);
-        assert_eq!(calculate_1rm(100.0, 0), 0.0);
-    }
-
-    #[test]
-    fn test_weight_from_1rm() {
-        // Weight for 1RM at 1 rep = 1RM
-        assert_eq!(weight_from_1rm(100.0, 1), 100.0);
-
-        // Inverse of calculate_1rm
-        let onerm = 112.5;
-        let weight = weight_from_1rm(onerm, 5);
-        assert!((weight - 100.0).abs() < 0.1);
-
-        // Edge cases
-        assert_eq!(weight_from_1rm(0.0, 5), 0.0);
-        assert_eq!(weight_from_1rm(100.0, 0), 0.0);
-    }
-
-    #[test]
-    fn test_convert_weight_for_display() {
-        // User wants kg - no conversion
-        assert_eq!(convert_weight_for_display(100.0, true), 100.0);
-
-        // User wants lbs - convert from kg
-        let lbs = convert_weight_for_display(100.0, false);
-        assert!((lbs - 220.462).abs() < 0.1); // 100 kg * 2.20462
-    }
-
-    #[test]
-    fn test_is_date_arg() {
-        // Valid date formats
-        assert!(is_date_arg("2025"));
-        assert!(is_date_arg("2025-01"));
-        assert!(is_date_arg("2025.01"));
-        assert!(is_date_arg("202501"));
-        assert!(is_date_arg("2025-01-15"));
-        assert!(is_date_arg("2025.01.15"));
-        assert!(is_date_arg("20250115"));
-
-        // Not dates (exercise filters)
-        assert!(!is_date_arg("deadlift"));
-        assert!(!is_date_arg("squat"));
-        assert!(!is_date_arg("#bp"));
-        assert!(!is_date_arg("bench press"));
-    }
-
-    #[test]
-    fn test_parse_date_and_filter_arguments() {
-        let args: Vec<String> = vec![
-            "2025".to_string(),
-            "deadlift".to_string(),
-            "2025-06".to_string(),
-            "squat".to_string(),
-        ];
-
-        let (dates, filters) = parse_date_and_filter_arguments(&args);
-
-        assert_eq!(dates, vec!["2025", "2025-06"]);
-        assert_eq!(filters, vec!["deadlift", "squat"]);
-    }
-
-    #[test]
-    fn test_matches_any_filter() {
-        let filters: Vec<String> = vec!["dead".to_string(), "squat".to_string()];
-
-        assert!(matches_any_filter("Deadlift", &filters));
-        assert!(matches_any_filter("DEADLIFT", &filters));
-        assert!(matches_any_filter("Squat", &filters));
-        assert!(matches_any_filter("Back Squat", &filters));
-        assert!(!matches_any_filter("Bench Press", &filters));
-
-        // Empty filters = match all
-        assert!(matches_any_filter("Anything", &[]));
-    }
-
-    #[test]
-    fn test_table_state_process_set() {
-        let mut state = TableState::new();
-
-        // First set - should create a record
-        state.process_set("2025-01-01", "Deadlift", Some(80.0), 100.0, 5);
-        assert_eq!(state.records.len(), 1);
-        assert_eq!(state.max_lift_width, 8);
-
-        // Same weight/reps but different date - not a PR
-        state.process_set("2025-01-02", "Deadlift", Some(80.0), 100.0, 5);
-        assert_eq!(state.records.len(), 1);
-
-        // Better 1RM for same rep range - should create a record
-        state.process_set("2025-01-03", "Deadlift", Some(80.0), 110.0, 5);
-        assert_eq!(state.records.len(), 2);
-
-        // Different rep range - should create a record
-        state.process_set("2025-01-04", "Deadlift", Some(80.0), 120.0, 3);
-        assert_eq!(state.records.len(), 3);
-    }
-
-    #[test]
-    fn test_gradient_color() {
-        // Recent records get bright yellow
-        assert_eq!(get_gradient_color(100, 100, 5), BRIGHT_YELLOW);
-
-        // Older records use gradient
-        let col = get_gradient_color(0, 100, 100);
-        assert_eq!(col, GRADIENT[0]);
-
-        let col = get_gradient_color(99, 100, 100);
-        assert_eq!(col, GRADIENT[GRADIENT.len() - 1]);
-    }
-}
