@@ -462,7 +462,12 @@ pub fn format_table(state: &TableState, filters: &[String], user_wants_kg: bool)
         }
         let colrep = if best { fg_256(best_col[rep]) } else { fg_256(BRIGHT_BLACK) };
         let reset = col_reset();
-        output.push_str(&format!(" {}{:3.0}{} |", colrep, best_lifted[rep], reset));
+        let str = if best_lifted[rep] > 0.0 {
+                &format!(" {}{:3.0}{} |", colrep, best_lifted[rep], reset)
+            } else {
+                "     |"
+            };
+        output.push_str(str);
     }
     output.push('\n');
 
