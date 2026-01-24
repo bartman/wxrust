@@ -25,7 +25,7 @@ impl ParserOptions {
     }
 }
 
-pub fn parse_bw_line(lines: &[&str], i: &mut usize) -> Result<Option<f32>, String> {
+pub fn parse_bw_line(lines: &[&str], i: &mut usize, options: &ParserOptions) -> Result<Option<f32>, String> {
     // Skip empty lines
     while *i < lines.len() && lines[*i].trim().is_empty() {
         *i += 1;
@@ -35,14 +35,15 @@ pub fn parse_bw_line(lines: &[&str], i: &mut usize) -> Result<Option<f32>, Strin
     }
     let line = lines[*i];
     if let Some(caps) = BW_REGEX.captures(line.trim()) {
-        let mut lb_to_kg = false;
-        if let Some(unit_match) = caps.get(2)
-            && unit_match.as_str() == "lbs" {
-                lb_to_kg = true;
-            };
+        let convert_to_kg = match caps.get(2) {
+            Some(unit_match) if unit_match.as_str() == "lbs" => true,
+            Some(unit_match) if unit_match.as_str() == "kg" => false,
+            None if !options.user_wants_kg => true,  // no units and user wants lbs, assume lbs and convert to kg
+            _ => false,  // no units and user wants kg, assume kg
+        };
         if let Some(num_match) = caps.get(1) {
             let bw_val: f32 = num_match.as_str().parse().map_err(|_| format!("Line {}: Invalid bw number: {}", *i + 1, num_match.as_str()))?;
-            let bw = if lb_to_kg {
+            let bw = if convert_to_kg {
                 Some(bw_val / LBS_PER_KG)
             } else {
                 Some(bw_val)
@@ -74,7 +75,7 @@ pub fn parse_workout_with_options(text: &str, options: &ParserOptions) -> Result
     i += 1;
 
     // Parse bw line (optional)
-    let bw = parse_bw_line(&lines, &mut i)?;
+    let bw = parse_bw_line(&lines, &mut i, options)?;
 
     // Now parse the rest, building log and extracting exercises
     let mut exercises = Vec::new();

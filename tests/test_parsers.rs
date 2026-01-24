@@ -467,19 +467,20 @@ fn test_format_rpe() {
 fn test_parse_bw_line() {
     let lines = vec!["@ 215 bw", "#exercise"];
     let mut i = 0;
-    let bw = parse_bw_line(&lines, &mut i).unwrap();
+    let options = ParserOptions::new(true); // user wants kg, so no units means kg
+    let bw = parse_bw_line(&lines, &mut i, &options).unwrap();
     assert_eq!(bw, Some(215.0));
     assert_eq!(i, 1);
 
     let lines2 = vec!["@ 200 lbs bw", "#exercise"];
     let mut i2 = 0;
-    let bw2 = parse_bw_line(&lines2, &mut i2).unwrap();
+    let bw2 = parse_bw_line(&lines2, &mut i2, &options).unwrap();
     assert_eq!(bw2, Some(200.0 / LBS_PER_KG));
     assert_eq!(i2, 1);
 
     let lines3 = vec!["#exercise"];
     let mut i3 = 0;
-    let bw3 = parse_bw_line(&lines3, &mut i3).unwrap();
+    let bw3 = parse_bw_line(&lines3, &mut i3, &options).unwrap();
     assert_eq!(bw3, None);
     assert_eq!(i3, 0);
 }
@@ -635,4 +636,39 @@ fn test_parser_options_round_trip_lbs() {
     
     // Cleanup
     forget_cached_user_wants_kg();
+}
+
+#[test]
+fn test_bw_parsing_without_units_bug() {
+    // This test demonstrates the bug: when user_wants_kg=false and bw has no units,
+    // exercise weights are treated as lbs but bw is treated as kg
+    let text = "2015-05-29
+@ 178 bw
+
+#squat #sq
+50 x 5 x 5
+
+#OHP #ohp
+60 x 5 x 5
+
+#deadlift #dl
+100 x 5
+";
+    let options = ParserOptions::new(false); // user wants lbs
+    let jday = parse_workout_with_options(text, &options).unwrap();
+
+    // After fix: bw without units is treated as lbs (since user_wants_kg=false) and converted to kg
+    let expected_bw_kg = 178.0 / LBS_PER_KG;
+    assert!(roughly_equal(jday.bw.unwrap(), expected_bw_kg, 0.01));
+
+    // Exercise weights without units are correctly treated as lbs and converted to kg
+    let expected_50_kg = 50.0 / LBS_PER_KG;
+    let expected_60_kg = 60.0 / LBS_PER_KG;
+    let expected_100_kg = 100.0 / LBS_PER_KG;
+
+    assert!(roughly_equal(jday.eblocks[0].sets[0].w.unwrap(), expected_50_kg, 0.01));
+    assert!(roughly_equal(jday.eblocks[1].sets[0].w.unwrap(), expected_60_kg, 0.01));
+    assert!(roughly_equal(jday.eblocks[2].sets[0].w.unwrap(), expected_100_kg, 0.01));
+
+    // After fix: both bw and weights are consistently treated as lbs and converted to kg
 }
