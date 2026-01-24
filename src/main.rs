@@ -8,6 +8,7 @@ mod parsers;
 mod fetch;
 mod table;
 mod heatmap;
+mod list;
 
 use clap::{Parser, Subcommand};
 
@@ -110,7 +111,9 @@ struct ListArgs {
     #[arg(short, long)]
     count: Option<u32>,
 
-    dates: Vec<String>,
+    /// Arguments can be dates (YYYY, YYYY-MM, YYYY-MM-DD, etc.) or exercise filters
+    /// Dates filter the date range, non-dates filter by exercise name (substring match)
+    args: Vec<String>,
 }
 
 #[derive(Parser)]
@@ -167,107 +170,7 @@ struct HeatmapArgs {
     args: Vec<String>,
 }
 
-async fn handle_list(
-    list: &ListArgs,
-    client: &ReqwestClient,
-    token: &Option<String>,
-    data_access: api::DataAccess<'_, ReqwestClient>,
-    verbose: bool,
-) {
-    let dates_to_use = if list.dates.is_empty() {
-        let (latest, oldest, count) = if list.all {
-            (None, None, 10000)
-        } else if let Some(before) = &list.before {
-            let cnt = list.count.unwrap_or(32);
-            (Some(before.clone()), None, cnt)
-        } else if let Some(cnt) = list.count {
-            (None, None, cnt)
-        } else {
-            (None, None, 32)
-        };
 
-        match workouts::get_dates(&data_access, latest, oldest, count, list.reverse).await {
-            Ok(d) => d,
-            Err(e) => utils::exit_with_error(e),
-        }
-    } else {
-        let mut all_dates = match workouts::get_dates_from_ranges(&data_access, &list.dates).await {
-            Ok(d) => d,
-            Err(e) => utils::exit_with_error(e),
-        };
-        if list.reverse {
-            all_dates.reverse();
-        }
-        all_dates
-    };
-
-    if dates_to_use.is_empty() {
-        utils::exit_with_error("No workouts found in the specified range");
-    }
-
-    if list.details || list.summary {
-        let user_wants_kg = workouts::resolve_user_wants_kg(&data_access).await;
-        let (tx, mut rx) = tokio::sync::mpsc::channel(32);
-        for (seq, date) in dates_to_use.iter().enumerate() {
-            let date = date.clone();
-            let client_clone = client.clone();
-            let token_clone = token.clone();
-            let verbose = verbose;
-            let use_network = data_access.use_network;
-            let use_cache = data_access.use_cache;
-            let write_cache = data_access.write_cache;
-            let uid = data_access.uid;
-            let tx_clone = tx.clone();
-            tokio::spawn(async move {
-                let data_access_clone = crate::api::DataAccess {
-                    client: &client_clone,
-                    token: token_clone.as_deref(),
-                    uid,
-                    use_network,
-                    use_cache,
-                    write_cache,
-                };
-                let result = match workouts::get_jday(&data_access_clone, &date, verbose).await {
-                    Ok(jday) => Some(jday),
-                    Err(e) => {
-                        eprintln!("Error getting workout for {}: {}", date, e);
-                        None
-                    }
-                };
-                tx_clone.send((seq, date.clone(), result)).await.unwrap();
-            });
-        }
-        drop(tx);
-        use std::collections::BTreeMap;
-        let mut buffer: BTreeMap<usize, (String, Option<models::JDay>)> = BTreeMap::new();
-        let mut next_seq = 0;
-        while let Some((seq, new_date, new_jday)) = rx.recv().await {
-            buffer.insert(seq, (new_date, new_jday));
-            while let Some((date, result)) = buffer.remove(&next_seq) {
-                let jday = match result {
-                    Some(jday) => jday,
-                    _ => continue
-                };
-                if list.details {
-                    let workout = formatters::format_workout(&date, &jday, user_wants_kg);
-                    println!("{}", workout);
-                    if !workout.ends_with('\n') {
-                        println!();
-                    }
-                } else if list.summary {
-                    let fmt_date = formatters::color_date(&date);
-                    let summary = formatters::summarize_workout(&jday, user_wants_kg);
-                    println!("{} {}", fmt_date, summary);
-                }
-                next_seq += 1;
-            }
-        }
-    } else {
-        for date in dates_to_use {
-            println!("{}", date);
-        }
-    }
-}
 
 async fn handle_show(
     show: &ShowArgs,
@@ -297,7 +200,7 @@ async fn handle_show(
     let user_wants_kg = workouts::resolve_user_wants_kg(&data_access).await;
     if show.summary {
         let fmt_date = formatters::color_date(&date);
-        let summary = formatters::summarize_workout(&jday, user_wants_kg);
+        let summary = formatters::summarize_workout(&jday, user_wants_kg, &[]);
         println!("{} {}", fmt_date, summary);
     } else {
         let workout = formatters::format_workout(&date, &jday, user_wants_kg);
@@ -382,7 +285,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match args.command {
         Commands::List(list) => {
-            handle_list(&list, &client, &token, data_access, args.verbose).await;
+            list::handle_list(&list, &client, &token, data_access, args.verbose).await;
         },
         Commands::Show(show) => {
             handle_show(&show, data_access, args.verbose).await;

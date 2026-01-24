@@ -75,6 +75,9 @@ Create a `credentials.txt` file with your WeightXReps account email on the first
 - List in a date range: `wxrust list 2025-10-01..2025-10-31`
 - Reverse order: `wxrust list --count 5 --reverse`
 - List all (up to 1000): `wxrust list --all`
+- List with exercise filter: `wxrust list --count 5 squat` (only dates with squats)
+- List range with filter: `wxrust list 2025-10-01..2025-10-31 bench` (only dates in range with bench press)
+- Summary with filter: `wxrust list --summary --count 2 deadlift` (summary only includes deadlifts)
 
 #### Fetch Workouts
 

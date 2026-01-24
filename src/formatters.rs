@@ -6,6 +6,7 @@ use crate::parsers::LBS_PER_KG;
 //use crate::models::{JDay, Set, Exercise, EBlock, User};
 use crate::models::{JDay, Set, Exercise, EBlock};
 use crate::workouts::read_cached_user_wants_kg_or;
+use crate::table::matches_any_filter;
 
 #[derive(Clone)]
 pub struct FormatOptions {
@@ -302,11 +303,11 @@ fn format_single_eblock_internal(jday: &JDay, eblock: &EBlock, options: &FormatO
     lines.join("\n")
 }
 
-pub fn summarize_workout(jday: &JDay, user_wants_kg: bool) -> String {
-    summarize_workout_internal(jday, &FormatOptions::for_display(user_wants_kg))
+pub fn summarize_workout(jday: &JDay, user_wants_kg: bool, filters: &[String]) -> String {
+    summarize_workout_internal(jday, &FormatOptions::for_display(user_wants_kg), filters)
 }
 
-fn summarize_workout_internal(jday: &JDay, options: &FormatOptions) -> String {
+fn summarize_workout_internal(jday: &JDay, options: &FormatOptions, filters: &[String]) -> String {
     let mut ex_map: HashMap<String, &Exercise> = HashMap::new();
     for ex_wrap in &jday.exercises {
         ex_map.insert(ex_wrap.exercise.id.clone(), &ex_wrap.exercise);
@@ -314,6 +315,9 @@ fn summarize_workout_internal(jday: &JDay, options: &FormatOptions) -> String {
     let mut summaries = Vec::new();
     for eblock in &jday.eblocks {
         if let Some(ex) = ex_map.get(&eblock.eid) {
+            if !matches_any_filter(&ex.name, filters) {
+                continue;
+            }
             // Find the heaviest set: max weight, then max reps
             let mut max_weight = 0.0;
             let mut max_reps = 0;

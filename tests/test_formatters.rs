@@ -103,8 +103,16 @@ fn test_summarize_workout() {
         exercises: vec![ex_wrapper],
     };
     unsafe { std::env::set_var("WXRUST_COLOR", "never"); }
-    let summary = summarize_workout(&jday, true);
+    let summary = summarize_workout(&jday, true, &[]);
     assert_eq!(summary, "#Squat  145x3");  // Max weight 145, max reps 3
+
+    // Test with matching filter
+    let summary_filtered = summarize_workout(&jday, true, &["squat".to_string()]);
+    assert_eq!(summary_filtered, "#Squat  145x3");
+
+    // Test with non-matching filter
+    let summary_filtered_no_match = summarize_workout(&jday, true, &["bench".to_string()]);
+    assert_eq!(summary_filtered_no_match, "");
 }
 
 #[test]

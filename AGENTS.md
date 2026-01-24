@@ -67,7 +67,8 @@ You can look in `weightxreps-client/src/data/generated---db-types-and-hooks.tsx`
 - Supports listing dates, detailed views, and summaries with concurrent fetching for improved performance.
 - Outputs full workout logs matching site format (date, bodyweight, program, sets, URL).
 - Handles user unit preferences for body weight display (kg or lb) fetched from API.
- - CLI with subcommands, options for count, before, reverse, details, summary, color control, and date ranges (using .. separator for inclusive ranges like 2025..2026 or 2025.. for open-ended ranges).
+  - CLI with subcommands, options for count, before, reverse, details, summary, color control, and date ranges (using .. separator for inclusive ranges like 2025..2026 or 2025.. for open-ended ranges).
+  - List command supports exercise filtering: `wxrust list <date-range> <filter>` lists only dates with workouts containing exercises matching filters (case-insensitive substring match).
 - Ensures ordered output in list commands by buffering concurrent async requests to maintain sequence.
 - Local caching of structured workout data in XDG_CACHE_HOME/wxrust/{uid}/yyyy-mm-dd.txt for offline access and performance.
 - Cache format is text, same as what is formatted for output using `format_workout_for_cache`
