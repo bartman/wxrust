@@ -192,6 +192,7 @@ Unlike the C version which shows separate tables per filter, the Rust implementa
 
 - Fixed bug in set formatting for failed sets (r=0): now correctly shows "weight x 0 x sets comment" instead of "weight comment"
 - Fixed w_in_lbs to use set.lb for correct unit conversion in formatting
+- Fixed summarize_workout to skip failed sets (reps == 0 or sets == 0) when determining the best set for summary display
 
 ## Future Improvements
 

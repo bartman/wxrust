@@ -319,12 +319,14 @@ fn summarize_workout_internal(jday: &JDay, options: &FormatOptions, filters: &[S
                 continue;
             }
             // Find the heaviest set: max weight, then max reps
+            // Skip failed sets (reps == 0 or sets == 0)
             let mut max_weight = 0.0;
             let mut max_reps = 0;
             for set in &eblock.sets {
                 let w = set.w.unwrap_or(0.0);
                 let r = set.r.unwrap_or(0);
-                if w > max_weight || (w == max_weight && r > max_reps) {
+                let s = set.s.unwrap_or(1);
+                if r > 0 && s > 0 && (w > max_weight || (w == max_weight && r > max_reps)) {
                     max_weight = w;
                     max_reps = r;
                 }
