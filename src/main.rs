@@ -19,25 +19,25 @@ use crate::api::{ReqwestClient, ApiClient};
 #[command(name = "wxrust")]
 #[command(about = "WeightXReps Rust client")]
 struct Args {
-    #[arg(short, long)]
+    #[arg(short, long, help = "Where to find credentials.txt file")]
     credentials: Option<String>,
 
-    #[arg(short = 'a', long = "force-authentication")]
+    #[arg(short = 'a', long = "force-authentication", help = "Do not use cached auth token")]
     force_auth: bool,
 
-    #[arg(long)]
+    #[arg(long, help = "Not allowed to connect to server")]
     no_network: bool,
 
-    #[arg(long)]
+    #[arg(long, help = "Not allosed to read from cache")]
     no_cache: bool,
 
-    #[arg(long)]
+    #[arg(long, help = "Not allowed to write to cache")]
     no_cache_write: bool,
 
-    #[arg(long, default_value = "auto")]
+    #[arg(long, default_value = "auto", help = "Color output policy: auto, always, never")]
     color: String,
 
-    #[arg(short, long)]
+    #[arg(short, long, help = "Enable debug output")]
     verbose: bool,
 
     #[command(subcommand)]
