@@ -97,10 +97,18 @@ pub async fn handle_heatmap<C: ApiClient + Clone + Send + Sync + 'static>(
         }
     }
 
+    let terminal_width = if let Some((w, _)) = term_size::dimensions() {
+        w
+    } else {
+        80 // Default width
+    };
+    let max_weeks = (terminal_width - 5) / 3;
+    let max_workouts = max_weeks * 7;
+
     // Get dates to process
     let dates = if date_args.is_empty() {
         // Default: get all dates from cache/server
-        match workouts::get_dates(&data_access, None, None, 10000, false).await {
+        match workouts::get_dates(&data_access, None, None, max_workouts as u32, false).await {
             Ok(d) => d,
             Err(e) => {
                 utils::exit_with_error(format!("Failed to get dates: {}", e));
