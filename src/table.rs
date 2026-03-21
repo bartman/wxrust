@@ -15,7 +15,7 @@ use crate::parsers::LBS_PER_KG;
 /// Maximum reps to track for rep-specific PRs
 const MAX_REPS: usize = 10;
 
-const ONERM_FACTOR: f32 = 46.0;
+const ONERM_FACTOR: f32 = 36.0;
 
 /// Color gradient for age-based coloring (256-color ANSI codes)
 /// From oldest (cool colors) to newest (warm colors)
