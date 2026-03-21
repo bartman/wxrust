@@ -15,6 +15,8 @@ use crate::parsers::LBS_PER_KG;
 /// Maximum reps to track for rep-specific PRs
 const MAX_REPS: usize = 10;
 
+const ONERM_FACTOR: f32 = 46.0;
+
 /// Color gradient for age-based coloring (256-color ANSI codes)
 /// From oldest (cool colors) to newest (warm colors)
 pub const GRADIENT: [u8; 20] = [
@@ -53,11 +55,11 @@ pub fn calculate_1rm(weight: f32, reps: u32) -> f32 {
     if reps == 1 {
         return weight;
     }
-    if reps >= 37 {
+    if reps > ONERM_FACTOR as u32 {
         // Brzycki formula breaks down at 37+ reps
         return weight * 2.0; // Rough estimate
     }
-    weight * (36.0 / (37.0 - reps as f32))
+    weight * (ONERM_FACTOR / (ONERM_FACTOR + 1.0 - (reps as f32)))
 }
 
 /// Calculate weight for a given 1RM and target reps using Brzycki formula
@@ -69,10 +71,10 @@ pub fn weight_from_1rm(onerm: f32, reps: u32) -> f32 {
     if reps == 1 {
         return onerm;
     }
-    if reps >= 37 {
+    if reps > ONERM_FACTOR as u32 {
         return onerm / 2.0; // Rough estimate
     }
-    onerm / (36.0 / (37.0 - reps as f32))
+    onerm / (ONERM_FACTOR / (ONERM_FACTOR + 1.0 - (reps as f32)))
 }
 
 /// Convert weight from kg to display units
