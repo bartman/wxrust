@@ -4,6 +4,8 @@
 
 A Rust CLI tool to extract and display workouts from the WeightXReps.net website. It authenticates using credentials from a file and retrieves workout data via the GraphQL API, with support for listing, showing, summarizing, and fetching workouts into local cache.
 
+[[ This project is loosly based on [bartman/wxrtools](https://github.com/bartman/wxrtools) that I wrote in C a long time ago. ]]
+
 ## Features
 
 - Authenticates using email and password from `credentials.txt` (email first line, password second)
