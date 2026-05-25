@@ -111,8 +111,7 @@ struct ListArgs {
     #[arg(short, long)]
     count: Option<u32>,
 
-    /// Arguments can be dates (YYYY, YYYY-MM, YYYY-MM-DD, etc.) or exercise filters
-    /// Dates filter the date range, non-dates filter by exercise name (substring match)
+    /// filter on dates (YYYY, YYYY-MM, YYYY-MM-DD, etc.) or exercise names (or substrings)
     args: Vec<String>,
 }
 
@@ -140,8 +139,7 @@ struct FetchArgs {
 
 #[derive(Parser)]
 struct TableArgs {
-    /// Arguments can be dates (YYYY, YYYY-MM, YYYY-MM-DD, etc.) or exercise filters
-    /// Dates filter the date range, non-dates filter by exercise name (substring match)
+    /// filter on dates (YYYY, YYYY-MM, YYYY-MM-DD, etc.) or exercise names (or substrings)
     args: Vec<String>,
 }
 
@@ -165,8 +163,7 @@ struct HeatmapArgs {
     #[arg(long)]
     green: bool,
 
-    /// Arguments can be dates (YYYY, YYYY-MM, YYYY-MM-DD, etc.) or exercise filters
-    /// Dates filter the date range, non-dates filter by exercise name (substring match)
+    /// filter on dates (YYYY, YYYY-MM, YYYY-MM-DD, etc.) or exercise names (or substrings)
     args: Vec<String>,
 }
 
