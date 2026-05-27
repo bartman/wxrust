@@ -385,7 +385,6 @@ pub fn format_table(state: &TableState, filters: &[String], user_wants_kg: bool)
         };
 
         let col = get_gradient_color(days_since_start, total_days, days_ago);
-        let full_reset = col_reset();
         let colbg  = if record.is_dream { bg_256(DREAM_BG) } else { bg_256(0) };
         let coltxt = format!("{}{}", colbg, fg_256(col));
         let coldim = format!("{}{}", colbg, fg_256(BRIGHT_BLACK));
