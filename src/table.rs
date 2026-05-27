@@ -494,7 +494,7 @@ pub async fn handle_table<C: ApiClient + Clone + Send + Sync + 'static>(
     token: &Option<String>,
     data_access: DataAccess<'_, C>,
     args: &[String],
-    dream_opt: &Option<String>,
+    dreams: &Vec<String>,
     verbose: bool,
 ) {
     // Parse arguments into dates and exercise filters
@@ -584,7 +584,8 @@ pub async fn handle_table<C: ApiClient + Clone + Send + Sync + 'static>(
         results.push(result);
     }
 
-    if let Some(dream) = dream_opt {
+    // Process each dream
+    for dream in dreams {
         // Use today's date
         let today = Utc::now().date_naive();
         let date = format!("{:04}-{:02}-{:02}", today.year(), today.month(), today.day());
@@ -630,7 +631,7 @@ pub async fn handle_table<C: ApiClient + Clone + Send + Sync + 'static>(
             }],
         };
 
-        results.push((date, Some(jday)));
+        results.push((date.clone(), Some(jday)));
     }
 
     // Sort by date to ensure chronological processing

@@ -142,7 +142,7 @@ struct TableArgs {
 
     /// provide a 1RM or Weight x Reps, and see how it stacks up
     #[arg(long)]
-    dream: Option<String>,
+    dream: Vec<String>,
 
     /// filter on dates (YYYY, YYYY-MM, YYYY-MM-DD, etc.) or exercise names (or substrings)
     args: Vec<String>,
