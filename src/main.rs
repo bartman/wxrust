@@ -139,6 +139,11 @@ struct FetchArgs {
 
 #[derive(Parser)]
 struct TableArgs {
+
+    /// provide a 1RM or Weight x Reps, and see how it stacks up
+    #[arg(long)]
+    dream: Option<String>,
+
     /// filter on dates (YYYY, YYYY-MM, YYYY-MM-DD, etc.) or exercise names (or substrings)
     args: Vec<String>,
 }
@@ -291,7 +296,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             handle_fetch(&fetch_args, data_access, args.verbose).await;
         },
         Commands::Table(table_args) => {
-            table::handle_table(&client, &token, data_access, &table_args.args, args.verbose).await;
+            table::handle_table(&client, &token, data_access, &table_args.args, &table_args.dream, args.verbose).await;
         },
         Commands::Heatmap(heatmap_args) => {
             // Determine metric - default to OneRm

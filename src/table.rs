@@ -1,16 +1,16 @@
 use std::collections::HashMap;
 use std::ops::Index;
 
-use chrono::{NaiveDate, Utc};
+use chrono::{NaiveDate, Utc, Datelike};
 use lazy_static::lazy_static;
 use ansi_term::Colour;
 
 use crate::api::{ApiClient, DataAccess};
-use crate::models::{JDay, Exercise};
+use crate::models::{JDay, EBlock, Exercise, ExerciseWrapper};
 use crate::workouts;
 use crate::utils;
 use crate::formatters::STDERR_COLOR_ENABLED;
-use crate::parsers::LBS_PER_KG;
+use crate::parsers::{LBS_PER_KG, ParserOptions, parse_set_line_with_options};
 
 /// Maximum reps to track for rep-specific PRs
 const MAX_REPS: usize = 10;
@@ -486,6 +486,7 @@ pub async fn handle_table<C: ApiClient + Clone + Send + Sync + 'static>(
     token: &Option<String>,
     data_access: DataAccess<'_, C>,
     args: &[String],
+    dream_opt: &Option<String>,
     verbose: bool,
 ) {
     // Parse arguments into dates and exercise filters
@@ -573,6 +574,55 @@ pub async fn handle_table<C: ApiClient + Clone + Send + Sync + 'static>(
     let mut results = Vec::new();
     while let Some(result) = rx.recv().await {
         results.push(result);
+    }
+
+    if let Some(dream) = dream_opt {
+        // Use today's date
+        let today = Utc::now().date_naive();
+        let date = format!("{:04}-{:02}-{:02}", today.year(), today.month(), today.day());
+
+        if verbose {
+            let msg = format!("Dream set: {}", dream);
+            if *STDERR_COLOR_ENABLED {
+                eprintln!("{}", Colour::Blue.paint(msg));
+            } else {
+                eprintln!("{}", msg);
+            }
+        }
+
+        // Normalize: ensure spaces around 'x' so parse_set_line can tokenize correctly
+        let dream_normalized = dream.replace("x", " x ");
+
+        // Parse using user's preferred units (user_wants_kg tells parser how to interpret bare numbers)
+        let options = ParserOptions::new(user_wants_kg);
+        let sets = match parse_set_line_with_options(&dream_normalized, &options) {
+            Ok(sets) => sets,
+            Err(e) => {
+                utils::exit_with_error(format!("Failed to parse dream '{}': {}", dream, e));
+            }
+        };
+
+        // Use first filter as the exercise name, or "Dream" if no filters
+        let exercise_name = filters.first().cloned().unwrap_or_else(|| "Dream".to_string());
+        let exercise_id = exercise_name.clone();
+
+        let jday = JDay {
+            log: format!("{}", dream),
+            bw: None,
+            eblocks: vec![EBlock {
+                eid: exercise_id.clone(),
+                sets,
+            }],
+            exercises: vec![ExerciseWrapper {
+                exercise: Exercise {
+                    id: exercise_id,
+                    name: exercise_name,
+                    ex_type: None,
+                },
+            }],
+        };
+
+        results.push((date, Some(jday)));
     }
 
     // Sort by date to ensure chronological processing
