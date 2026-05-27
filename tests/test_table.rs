@@ -184,7 +184,7 @@ fn test_table_state_new() {
 fn test_table_state_process_set_first_record() {
     let mut state = TableState::new();
 
-    state.process_set("2025-01-01", "Deadlift", Some(80.0), 100.0, 5);
+    state.process_set("2025-01-01", "Deadlift", Some(80.0), 100.0, 5, false);
 
     assert_eq!(state.records.len(), 1);
     assert_eq!(state.max_lift_width, 8); // "Deadlift" length
@@ -198,11 +198,11 @@ fn test_table_state_process_set_not_pr() {
     let mut state = TableState::new();
 
     // First set creates a record
-    state.process_set("2025-01-01", "Deadlift", Some(80.0), 100.0, 5);
+    state.process_set("2025-01-01", "Deadlift", Some(80.0), 100.0, 5, false);
     assert_eq!(state.records.len(), 1);
 
     // Same weight/reps - not a PR
-    state.process_set("2025-01-02", "Deadlift", Some(80.0), 100.0, 5);
+    state.process_set("2025-01-02", "Deadlift", Some(80.0), 100.0, 5, false);
     assert_eq!(state.records.len(), 1); // No new record
 }
 
@@ -210,11 +210,11 @@ fn test_table_state_process_set_not_pr() {
 fn test_table_state_process_set_new_pr() {
     let mut state = TableState::new();
 
-    state.process_set("2025-01-01", "Deadlift", Some(80.0), 100.0, 5);
+    state.process_set("2025-01-01", "Deadlift", Some(80.0), 100.0, 5, false);
     assert_eq!(state.records.len(), 1);
 
     // Better weight for same reps - new PR
-    state.process_set("2025-01-03", "Deadlift", Some(80.0), 110.0, 5);
+    state.process_set("2025-01-03", "Deadlift", Some(80.0), 110.0, 5, false);
     assert_eq!(state.records.len(), 2);
 }
 
@@ -222,11 +222,11 @@ fn test_table_state_process_set_new_pr() {
 fn test_table_state_process_set_different_rep_range() {
     let mut state = TableState::new();
 
-    state.process_set("2025-01-01", "Deadlift", Some(80.0), 100.0, 5);
+    state.process_set("2025-01-01", "Deadlift", Some(80.0), 100.0, 5, false);
     assert_eq!(state.records.len(), 1);
 
     // Different rep range - new PR
-    state.process_set("2025-01-04", "Deadlift", Some(80.0), 120.0, 3);
+    state.process_set("2025-01-04", "Deadlift", Some(80.0), 120.0, 3, false);
     assert_eq!(state.records.len(), 2);
 }
 
@@ -235,11 +235,11 @@ fn test_table_state_process_set_invalid_input() {
     let mut state = TableState::new();
 
     // Zero weight
-    state.process_set("2025-01-01", "Deadlift", Some(80.0), 0.0, 5);
+    state.process_set("2025-01-01", "Deadlift", Some(80.0), 0.0, 5, false);
     assert!(state.records.is_empty());
 
     // Zero reps
-    state.process_set("2025-01-01", "Deadlift", Some(80.0), 100.0, 0);
+    state.process_set("2025-01-01", "Deadlift", Some(80.0), 100.0, 0, false);
     assert!(state.records.is_empty());
 }
 
@@ -248,13 +248,13 @@ fn test_table_state_process_set_same_day_same_reps_update() {
     let mut state = TableState::new();
 
     // First set for 5 reps
-    state.process_set("2025-01-01", "Deadlift", Some(80.0), 100.0, 5);
+    state.process_set("2025-01-01", "Deadlift", Some(80.0), 100.0, 5, false);
     assert_eq!(state.records.len(), 1);
     assert_eq!(state.records[0].best_weight, 100.0);
     assert_eq!(state.records[0].best_reps, 5);
 
     // Better weight for same reps on same day - should update existing record
-    state.process_set("2025-01-01", "Deadlift", Some(80.0), 110.0, 5);
+    state.process_set("2025-01-01", "Deadlift", Some(80.0), 110.0, 5, false);
     assert_eq!(state.records.len(), 1); // Still only 1 record
     assert_eq!(state.records[0].best_weight, 110.0); // Updated weight
     assert_eq!(state.records[0].best_reps, 5); // Same reps
@@ -302,7 +302,7 @@ fn test_process_workout_no_filters() {
     let mut state = TableState::new();
     let filters: Vec<String> = vec![];
 
-    process_workout(&jday, "2025-01-01", &filters, &mut state);
+    process_workout(&jday, "2025-01-01", &filters, &mut state, false);
 
     // Both sets should create records (different rep ranges)
     assert_eq!(state.records.len(), 2);
@@ -314,7 +314,7 @@ fn test_process_workout_with_matching_filter() {
     let mut state = TableState::new();
     let filters: Vec<String> = vec!["dead".to_string()];
 
-    process_workout(&jday, "2025-01-01", &filters, &mut state);
+    process_workout(&jday, "2025-01-01", &filters, &mut state, false);
 
     assert_eq!(state.records.len(), 1);
     assert_eq!(state.records[0].exercise_name, "Deadlift");
@@ -326,7 +326,7 @@ fn test_process_workout_with_non_matching_filter() {
     let mut state = TableState::new();
     let filters: Vec<String> = vec!["squat".to_string()];
 
-    process_workout(&jday, "2025-01-01", &filters, &mut state);
+    process_workout(&jday, "2025-01-01", &filters, &mut state, false);
 
     assert!(state.records.is_empty());
 }
@@ -337,7 +337,7 @@ fn test_process_workout_case_insensitive_filter() {
     let mut state = TableState::new();
     let filters: Vec<String> = vec!["DEAD".to_string()];
 
-    process_workout(&jday, "2025-01-01", &filters, &mut state);
+    process_workout(&jday, "2025-01-01", &filters, &mut state, false);
 
     assert_eq!(state.records.len(), 1);
 }
@@ -348,7 +348,7 @@ fn test_process_workout_multiple_filters_or() {
     let mut state = TableState::new();
     let filters: Vec<String> = vec!["squat".to_string(), "dead".to_string()];
 
-    process_workout(&jday, "2025-01-01", &filters, &mut state);
+    process_workout(&jday, "2025-01-01", &filters, &mut state, false);
 
     // Should match because "dead" matches "Deadlift"
     assert_eq!(state.records.len(), 1);
@@ -371,7 +371,7 @@ fn test_format_table_empty() {
 #[test]
 fn test_format_table_with_records() {
     let mut state = TableState::new();
-    state.process_set("2025-01-01", "Deadlift", Some(80.0), 100.0, 5);
+    state.process_set("2025-01-01", "Deadlift", Some(80.0), 100.0, 5, false);
 
     let filters: Vec<String> = vec!["dead".to_string()];
 
@@ -389,7 +389,7 @@ fn test_format_table_with_records() {
 #[test]
 fn test_format_table_header_row() {
     let mut state = TableState::new();
-    state.process_set("2025-01-01", "Deadlift", Some(80.0), 100.0, 5);
+    state.process_set("2025-01-01", "Deadlift", Some(80.0), 100.0, 5, false);
 
     let filters: Vec<String> = vec![];
 
@@ -408,7 +408,7 @@ fn test_format_table_header_row() {
 #[test]
 fn test_format_table_best_weight_row() {
     let mut state = TableState::new();
-    state.process_set("2025-01-01", "Deadlift", Some(80.0), 100.0, 5);
+    state.process_set("2025-01-01", "Deadlift", Some(80.0), 100.0, 5, false);
 
     let filters: Vec<String> = vec![];
 
@@ -437,19 +437,19 @@ fn test_table_state_process_set() {
     let mut state = TableState::new();
 
     // First set - should create a record
-    state.process_set("2025-01-01", "Deadlift", Some(80.0), 100.0, 5);
+    state.process_set("2025-01-01", "Deadlift", Some(80.0), 100.0, 5, false);
     assert_eq!(state.records.len(), 1);
     assert_eq!(state.max_lift_width, 8);
 
     // Same weight/reps but different date - not a PR
-    state.process_set("2025-01-02", "Deadlift", Some(80.0), 100.0, 5);
+    state.process_set("2025-01-02", "Deadlift", Some(80.0), 100.0, 5, false);
     assert_eq!(state.records.len(), 1);
 
     // Better 1RM for same rep range - should create a record
-    state.process_set("2025-01-03", "Deadlift", Some(80.0), 110.0, 5);
+    state.process_set("2025-01-03", "Deadlift", Some(80.0), 110.0, 5, false);
     assert_eq!(state.records.len(), 2);
 
     // Different rep range - should create a record
-    state.process_set("2025-01-04", "Deadlift", Some(80.0), 120.0, 3);
+    state.process_set("2025-01-04", "Deadlift", Some(80.0), 120.0, 3, false);
     assert_eq!(state.records.len(), 3);
 }

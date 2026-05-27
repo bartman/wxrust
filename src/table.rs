@@ -29,6 +29,8 @@ pub const GRADIENT: [u8; 20] = [
 pub const BRIGHT_YELLOW: u8 = 11;
 /// Bright black (gray) for dimmed text
 const BRIGHT_BLACK: u8 = 8;
+/// Dark purple background for dream entries
+const DREAM_BG: u8 = 53;
 
 lazy_static! {
     static ref COLOR_ENABLED: bool = {
@@ -128,6 +130,8 @@ pub struct Record {
     pub best_weight: f32,
     pub best_reps: u32,
     pub best_1rm: f32,
+    /// True if this record came from a --dream injection
+    pub is_dream: bool,
 }
 
 /// State for tracking PRs during processing
@@ -159,6 +163,7 @@ impl TableState {
         body_weight: Option<f32>,
         weight: f32,
         reps: u32,
+        is_dream: bool,
     ) {
         if weight <= 0.0 || reps == 0 {
             return;
@@ -169,7 +174,7 @@ impl TableState {
 
         // Check if this is a new PR for this rep range
         let is_new_rep_pr = r <= MAX_REPS && self.best_1rm_for_reps[r] < ent_1rm;
-        if ! is_new_rep_pr { return; };
+        if ! is_new_rep_pr && !is_dream { return; };
 
         // Check if this PR replaces an existing PR on the same day
         let old_index = self.best_1rm_index[r];
@@ -203,6 +208,7 @@ impl TableState {
                 best_weight: weight,
                 best_reps: reps,
                 best_1rm: ent_1rm,
+                is_dream,
             };
 
             self.records.push(record);
@@ -246,6 +252,7 @@ pub fn process_workout(
     date: &str,
     filters: &[String],
     state: &mut TableState,
+    is_dream: bool,
 ) {
     // Build exercise ID -> Exercise map
     let mut ex_map: HashMap<String, &Exercise> = HashMap::new();
@@ -267,7 +274,7 @@ pub fn process_workout(
                 let sets = set.s.unwrap_or(0);
 
                 if weight > 0.0 && reps > 0 && sets > 0 {
-                    state.process_set(date, &ex.name, jday.bw, weight, reps);
+                    state.process_set(date, &ex.name, jday.bw, weight, reps, is_dream);
                 }
             }
         }
@@ -378,9 +385,11 @@ pub fn format_table(state: &TableState, filters: &[String], user_wants_kg: bool)
         };
 
         let col = get_gradient_color(days_since_start, total_days, days_ago);
-        let coltxt = fg_256(col);
-        let coldim = fg_256(BRIGHT_BLACK);
-        let reset = col_reset();
+        let full_reset = col_reset();
+        let colbg  = if record.is_dream { bg_256(DREAM_BG) } else { bg_256(0) };
+        let coltxt = format!("{}{}", colbg, fg_256(col));
+        let coldim = format!("{}{}", colbg, fg_256(BRIGHT_BLACK));
+        let reset  = format!("{}{}", colbg, fg_256(15));
 
         // Convert weights for display
         let display_weight = convert_weight_for_display(record.best_weight, user_wants_kg);
@@ -607,7 +616,7 @@ pub async fn handle_table<C: ApiClient + Clone + Send + Sync + 'static>(
         let exercise_id = exercise_name.clone();
 
         let jday = JDay {
-            log: format!("{}", dream),
+            log: "dream".to_string(),
             bw: None,
             eblocks: vec![EBlock {
                 eid: exercise_id.clone(),
@@ -631,7 +640,8 @@ pub async fn handle_table<C: ApiClient + Clone + Send + Sync + 'static>(
     let mut state = TableState::new();
     for (date, jday_opt) in results {
         if let Some(jday) = jday_opt {
-            process_workout(&jday, &date, &filters, &mut state);
+            let is_dream = jday.log == "dream";
+            process_workout(&jday, &date, &filters, &mut state, is_dream);
         }
     }
 
