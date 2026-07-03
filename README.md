@@ -1,5 +1,6 @@
 # wxrust - WeightXReps Workout Extractor
 
+[![CI](https://github.com/bartman/wxrust/actions/workflows/ci.yml/badge.svg)](https://github.com/bartman/wxrust/actions)
 [![codecov](https://codecov.io/gh/bartman/wxrust/branch/master/graph/badge.svg)](https://app.codecov.io/github/bartman/wxrust)
 
 A Rust CLI tool to extract and display workouts from the WeightXReps.net website. It authenticates using credentials from a file and retrieves workout data via the GraphQL API, with support for listing, showing, summarizing, and fetching workouts into local cache.
