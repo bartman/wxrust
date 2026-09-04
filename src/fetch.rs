@@ -57,7 +57,9 @@ pub async fn fetch_command<C: ApiClient>(
     let mut need = Vec::new();
     for date in &dates_to_fetch {
         if !force && workouts::cached_jday_exists(uid, date) {
-            pb.println(format!("{} already cached, skipping", date));
+            if stats {
+                pb.println(format!("{} already cached, skipping", date));
+            }
             pb.inc(1);
         } else {
             need.push(date.clone());

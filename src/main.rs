@@ -164,7 +164,7 @@ struct FetchArgs {
     #[arg(long, value_name = "FILE")]
     file: Option<String>,
 
-    /// Print transfer rate (T/s, MB/s) after fetch
+    /// Print skip messages and transfer rate (T/s, MB/s) after fetch
     #[arg(long)]
     stats: bool,
 

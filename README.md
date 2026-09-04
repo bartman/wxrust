@@ -99,7 +99,7 @@ Create a `credentials.txt` file with your WeightXReps account email on the first
 - Import from text export file: `wxrust fetch --file export.txt`
 - Print transfer rate after fetch: `wxrust fetch --stats 2026`
 
-`fetch` downloads workouts concurrently (10 dates per GraphQL request, 8 requests in flight) and skips dates that are already cached unless `--force` is used. `--stats` prints `X workouts, Y seconds, x.y T/s, x.y MB/s` after the progress line. `--diff` compares the cache file to what a fetch would write and prints nothing for unchanged days.
+`fetch` downloads workouts concurrently (10 dates per GraphQL request, 8 requests in flight) and skips dates that are already cached unless `--force` is used. `--stats` prints per-date skip messages (`YYYY-MM-DD already cached, skipping`) and `X workouts, Y seconds, x.y T/s, x.y MB/s` after the progress line. `--diff` compares the cache file to what a fetch would write and prints nothing for unchanged days.
 
 #### Table Command (PR Progression)
 
