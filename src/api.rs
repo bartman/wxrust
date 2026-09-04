@@ -67,7 +67,11 @@ pub struct ReqwestClient {
 impl ReqwestClient {
     pub fn new_with_verbose(verbose: bool) -> Self {
         ReqwestClient {
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder()
+                .pool_max_idle_per_host(32)
+                .tcp_nodelay(true)
+                .build()
+                .expect("failed to build HTTP client"),
             verbose,
             user_info: OnceCell::new(),
         }

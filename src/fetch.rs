@@ -1,4 +1,4 @@
-use crate::api::ReqwestClient;
+use crate::api::ApiClient;
 use crate::formatters;
 use crate::models;
 use crate::parsers;
@@ -6,9 +6,10 @@ use crate::utils;
 use crate::workouts;
 use regex::Regex;
 use std::fs;
+use std::time::Instant;
 
-pub async fn fetch_command(
-    data_access: &crate::api::DataAccess<'_, ReqwestClient>,
+pub async fn fetch_command<C: ApiClient>(
+    data_access: &crate::api::DataAccess<'_, C>,
     dates: &[String],
     diff: bool,
     force: bool,
@@ -28,34 +29,78 @@ pub async fn fetch_command(
         return Ok(());
     }
 
+    if diff {
+        return fetch_diff(data_access, uid, &dates_to_fetch, verbose).await;
+    }
+
     let pb = utils::create_progress_bar(dates_to_fetch.len() as u64);
 
+    let mut need = Vec::new();
     for date in &dates_to_fetch {
-        pb.set_message(format!("Fetching {}", date));
-
-        if diff {
-            let server_jday = workouts::get_jday(data_access, date, verbose).await?;
-            let local_jday = workouts::lookup_cached_jday(uid, date, verbose);
-
-            if let Some(local) = local_jday {
-                show_diff(date, &local, &server_jday);
-            } else {
-                println!("{}: No local cache, server version:", date);
-                let user_wants_kg = workouts::resolve_user_wants_kg(data_access).await;
-                let workout = formatters::format_workout(date, &server_jday, user_wants_kg);
-                print!("{}", workout);
-            }
-        } else if !force && workouts::lookup_cached_jday(uid, date, verbose).is_some() {
+        if !force && workouts::cached_jday_exists(uid, date) {
             pb.println(format!("{} already cached, skipping", date));
+            pb.inc(1);
         } else {
-            let jday = workouts::get_jday(data_access, date, verbose).await?;
-            workouts::write_cached_jday(uid, date, &jday);
+            need.push(date.clone());
         }
+    }
 
-        pb.inc(1);
+    if !need.is_empty() {
+        let start = Instant::now();
+        workouts::get_jdays_with_callback(
+            data_access,
+            &need,
+            workouts::JDAY_BATCH_SIZE,
+            workouts::FETCH_CONCURRENCY,
+            verbose,
+            |date, jday| {
+                workouts::write_cached_jday(uid, date, jday);
+                pb.set_message(format!("Fetching {}", date));
+                pb.inc(1);
+            },
+        )
+        .await?;
+        if verbose {
+            eprintln!(
+                "Fetched {} workouts in {:.2}s ({} per request, concurrency {})",
+                need.len(),
+                start.elapsed().as_secs_f64(),
+                workouts::JDAY_BATCH_SIZE,
+                workouts::FETCH_CONCURRENCY
+            );
+        }
     }
 
     pb.finish_with_message("Done");
+
+    Ok(())
+}
+
+async fn fetch_diff<C: ApiClient>(
+    data_access: &crate::api::DataAccess<'_, C>,
+    uid: u32,
+    dates: &[String],
+    verbose: bool,
+) -> Result<(), String> {
+    let pb = utils::create_progress_bar(dates.len() as u64);
+    pb.set_message("Fetching");
+    let user_wants_kg = workouts::resolve_user_wants_kg(data_access).await;
+
+    let fetched = workouts::get_jdays(data_access, dates, verbose).await?;
+    pb.inc(dates.len() as u64);
+
+    pb.finish_and_clear();
+
+    for (date, server_jday) in fetched {
+        let local_jday = workouts::lookup_cached_jday(uid, &date, verbose);
+        if let Some(local) = local_jday {
+            show_diff(&date, &local, &server_jday);
+        } else {
+            println!("{}: No local cache, server version:", date);
+            let workout = formatters::format_workout(&date, &server_jday, user_wants_kg);
+            print!("{}", workout);
+        }
+    }
 
     Ok(())
 }
@@ -112,8 +157,8 @@ fn parse_file_export(content: &str) -> Result<Vec<(String, models::JDay)>, Strin
     Ok(workouts_list)
 }
 
-async fn get_dates_to_fetch(
-    data_access: &crate::api::DataAccess<'_, ReqwestClient>,
+async fn get_dates_to_fetch<C: ApiClient>(
+    data_access: &crate::api::DataAccess<'_, C>,
     dates: &[String],
 ) -> Result<Vec<String>, String> {
     if dates.is_empty() {

@@ -3,10 +3,27 @@ use crate::formatters;
 use crate::models;
 use crate::parsers;
 use chrono::{Datelike, Utc};
+use futures::StreamExt;
 use lazy_static::lazy_static;
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
+
+/// Number of `jday` selections packed into one GraphQL request via aliases.
+pub const JDAY_BATCH_SIZE: usize = 10;
+/// Maximum number of batched GraphQL requests in flight during a bulk fetch.
+pub const FETCH_CONCURRENCY: usize = 8;
+
+const JDAY_FIELDS: &str = r#"    log
+    bw
+    eblocks {
+      eid
+      sets { w r s lb rpe pr est1rm eff int type t d dunit speed force c }
+    }
+    exercises {
+      exercise { id name type }
+    }"#;
 
 lazy_static! {
     static ref USER_WANTS_KG: Mutex<Option<bool>> = Mutex::new(None);
@@ -106,6 +123,42 @@ fn get_cache_file_path(uid: u32, date: &str) -> Result<PathBuf, String> {
     Ok(cache_dir.join(format!("{}.txt", date)))
 }
 
+/// True if a cache file exists for this uid/date (does not parse the contents).
+pub fn cached_jday_exists(uid: u32, date: &str) -> bool {
+    get_cache_file_path(uid, date).map(|p| p.exists()).unwrap_or(false)
+}
+
+pub fn jday_alias(index: usize) -> String {
+    format!("d{}", index)
+}
+
+pub fn chunk_dates(dates: &[String], batch_size: usize) -> Vec<Vec<String>> {
+    let batch_size = batch_size.max(1);
+    dates.chunks(batch_size).map(|c| c.to_vec()).collect()
+}
+
+pub fn build_jday_query(uid: u32, date: &str) -> String {
+    format!(
+        "query {{\n  jday(uid: {}, ymd: \"{}\") {{\n{}\n  }}\n}}\n",
+        uid, date, JDAY_FIELDS
+    )
+}
+
+pub fn build_batch_jday_query(uid: u32, dates: &[String]) -> String {
+    let mut q = String::from("query {\n");
+    for (i, date) in dates.iter().enumerate() {
+        q.push_str(&format!(
+            "  {}: jday(uid: {}, ymd: \"{}\") {{\n{}\n  }}\n",
+            jday_alias(i),
+            uid,
+            date,
+            JDAY_FIELDS
+        ));
+    }
+    q.push_str("}\n");
+    q
+}
+
 pub fn get_dates_from_cache(uid: u32, latest: Option<String>, oldest: Option<String>, count: u32, reverse: bool) -> Result<Vec<String>, String> {
     let cache_dir = get_cache_dir(uid)?;
     if !cache_dir.exists() {
@@ -192,22 +245,7 @@ pub async fn get_jday<C: crate::api::ApiClient>(data_access: &crate::api::DataAc
 
     let token = data_access.token.ok_or("No token available for network request")?;
 
-    let query = format!(r#"
-query {{
-  jday(uid: {}, ymd: "{}") {{
-    log
-    bw
-    eblocks {{
-      eid
-      sets {{ w r s lb rpe pr est1rm eff int type t d dunit speed force c }}
-    }}
-    exercises {{
-      exercise {{ id name type }}
-    }}
-  }}
-}}
-"#,
-    uid, date);
+    let query = build_jday_query(uid, date);
 
     let response: models::GraphQLResponse<models::WorkoutData> = api::graphql_request(client, token, &query, None).await.map_err(|e| e.to_string())?;
 
@@ -229,6 +267,143 @@ query {{
     } else {
         Err("Unexpected response.".to_string())
     }
+}
+
+async fn fetch_jdays_from_network<C: crate::api::ApiClient>(
+    data_access: &crate::api::DataAccess<'_, C>,
+    uid: u32,
+    dates: &[String],
+    _verbose: bool,
+) -> Result<Vec<(String, models::JDay)>, String> {
+    let token = data_access.token.ok_or("No token available for network request")?;
+    let query = build_batch_jday_query(uid, dates);
+    let response: models::GraphQLResponse<models::BatchJDayData> =
+        api::graphql_request(data_access.client, token, &query, None)
+            .await
+            .map_err(|e| e.to_string())?;
+
+    if let Some(errors) = response.errors {
+        return Err(errors.into_iter().map(|e| e.message).collect::<Vec<_>>().join("; "));
+    }
+
+    let mut data = response.data.ok_or_else(|| "Unexpected response.".to_string())?;
+    let mut results = Vec::with_capacity(dates.len());
+    for (i, date) in dates.iter().enumerate() {
+        let key = jday_alias(i);
+        match data.remove(&key) {
+            Some(Some(jday)) => results.push((date.clone(), jday)),
+            Some(None) => return Err(format!("No workout found for {}", date)),
+            None => return Err(format!("Unexpected response: missing {} for {}", key, date)),
+        }
+    }
+    Ok(results)
+}
+
+/// Fetch a group of dates in a single GraphQL request (via aliases).
+///
+/// Cached dates are served locally when `use_cache` is set. Newly fetched
+/// workouts are written to cache when `write_cache` is set.
+pub async fn get_jdays_batch<C: crate::api::ApiClient>(
+    data_access: &crate::api::DataAccess<'_, C>,
+    dates: &[String],
+    verbose: bool,
+) -> Result<Vec<(String, models::JDay)>, String> {
+    if dates.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let uid = data_access.uid.ok_or("No user ID available")?;
+    let mut found: HashMap<String, models::JDay> = HashMap::new();
+    let mut missing: Vec<String> = Vec::new();
+
+    for date in dates {
+        if data_access.use_cache {
+            if let Some(jday) = lookup_cached_jday(uid, date, verbose) {
+                found.insert(date.clone(), jday);
+                continue;
+            }
+        }
+        missing.push(date.clone());
+    }
+
+    if !missing.is_empty() {
+        if !data_access.use_network {
+            return Err(format!("No workout found for {} (network access disabled)", missing[0]));
+        }
+        let fetched = fetch_jdays_from_network(data_access, uid, &missing, verbose).await?;
+        for (date, jday) in fetched {
+            if data_access.write_cache {
+                write_cached_jday(uid, &date, &jday);
+            }
+            found.insert(date, jday);
+        }
+    }
+
+    let mut results = Vec::with_capacity(dates.len());
+    for date in dates {
+        match found.remove(date) {
+            Some(jday) => results.push((date.clone(), jday)),
+            None => return Err(format!("No workout found for {}", date)),
+        }
+    }
+    Ok(results)
+}
+
+/// Fetch many dates concurrently, packing up to `JDAY_BATCH_SIZE` into each request.
+pub async fn get_jdays<C: crate::api::ApiClient>(
+    data_access: &crate::api::DataAccess<'_, C>,
+    dates: &[String],
+    verbose: bool,
+) -> Result<Vec<(String, models::JDay)>, String> {
+    get_jdays_with_callback(
+        data_access,
+        dates,
+        JDAY_BATCH_SIZE,
+        FETCH_CONCURRENCY,
+        verbose,
+        |_, _| {},
+    )
+    .await
+}
+
+pub async fn get_jdays_with_callback<C, F>(
+    data_access: &crate::api::DataAccess<'_, C>,
+    dates: &[String],
+    batch_size: usize,
+    concurrency: usize,
+    verbose: bool,
+    mut on_workout: F,
+) -> Result<Vec<(String, models::JDay)>, String>
+where
+    C: crate::api::ApiClient,
+    F: FnMut(&str, &models::JDay),
+{
+    if dates.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let chunks = chunk_dates(dates, batch_size);
+    let concurrency = concurrency.max(1);
+    let mut stream = futures::stream::iter(chunks)
+        .map(|chunk| async move { get_jdays_batch(data_access, &chunk, verbose).await })
+        .buffer_unordered(concurrency);
+
+    let mut collected: HashMap<String, models::JDay> = HashMap::new();
+    while let Some(result) = stream.next().await {
+        for (date, jday) in result? {
+            on_workout(&date, &jday);
+            collected.insert(date, jday);
+        }
+    }
+
+    let mut ordered = Vec::with_capacity(dates.len());
+    for date in dates {
+        match collected.remove(date) {
+            Some(jday) => ordered.push((date.clone(), jday)),
+            None => return Err(format!("No workout found for {}", date)),
+        }
+    }
+    Ok(ordered)
 }
 
 pub async fn get_dates<C: crate::api::ApiClient>(data_access: &crate::api::DataAccess<'_, C>, latest: Option<String>, oldest: Option<String>, count: u32, reverse: bool) -> Result<Vec<String>, String> {
