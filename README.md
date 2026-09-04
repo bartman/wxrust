@@ -18,7 +18,7 @@ A Rust CLI tool to extract and display workouts from the WeightXReps.net website
 - Supports detailed views, summaries, and date filtering
 - Handles JWT tokens and GraphQL queries efficiently
 - Caches workout data locally in XDG cache directory for improved performance
-- Fetches and caches workouts in bulk with progress indication
+- Fetches and caches workouts in bulk with progress indication, using batched concurrent GraphQL requests
 - Compares local cache with server versions
 - Imports workouts from text export files
 
@@ -91,6 +91,9 @@ Create a `credentials.txt` file with your WeightXReps account email on the first
 - Show diff between local and server: `wxrust fetch --diff 2025-10`
 - Force re-download: `wxrust fetch --force 2025`
 - Import from text export file: `wxrust fetch --file export.txt`
+- Print transfer rate after fetch: `wxrust fetch --stats 2026`
+
+`fetch` downloads workouts concurrently (10 dates per GraphQL request, 8 requests in flight) and skips dates that are already cached unless `--force` is used. `--stats` prints `X workouts, Y seconds, x.y T/s, x.y MB/s` after the progress line.
 
 #### Table Command (PR Progression)
 

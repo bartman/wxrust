@@ -67,6 +67,9 @@ pub struct WorkoutData {
     pub jday: Option<JDay>,
 }
 
+/// GraphQL alias map used by batched `jday` queries (`d0`, `d1`, ...).
+pub type BatchJDayData = std::collections::HashMap<String, Option<JDay>>;
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[allow(dead_code)]
 pub struct JDay {
