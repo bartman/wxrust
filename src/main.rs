@@ -134,6 +134,9 @@ struct FetchArgs {
     #[arg(long, value_name = "FILE")]
     file: Option<String>,
 
+    #[arg(long, help = "Print transfer rate (T/s, MB/s) after fetch")]
+    stats: bool,
+
     dates: Vec<String>,
 }
 
@@ -225,6 +228,7 @@ async fn handle_fetch(
         fetch_args.force,
         fetch_args.file.as_deref(),
         verbose,
+        fetch_args.stats,
     ).await {
         utils::exit_with_error(e);
     }

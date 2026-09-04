@@ -8,6 +8,24 @@ use regex::Regex;
 use std::fs;
 use std::time::Instant;
 
+pub fn format_transfer_stats(transfers: u64, bytes: u64, elapsed_secs: f64) -> String {
+    let (tps, mbps) = if elapsed_secs > 0.0 {
+        (
+            transfers as f64 / elapsed_secs,
+            (bytes as f64 / 1_000_000.0) / elapsed_secs,
+        )
+    } else {
+        (0.0, 0.0)
+    };
+    format!(
+        "{} workouts, {:.2} seconds, {:.1} T/s, {:.2} MB/s",
+        transfers,
+        elapsed_secs.max(0.0),
+        tps,
+        mbps
+    )
+}
+
 pub async fn fetch_command<C: ApiClient>(
     data_access: &crate::api::DataAccess<'_, C>,
     dates: &[String],
@@ -15,6 +33,7 @@ pub async fn fetch_command<C: ApiClient>(
     force: bool,
     file: Option<&str>,
     verbose: bool,
+    stats: bool,
 ) -> Result<(), String> {
     let uid = data_access.uid.ok_or("No user ID available")?;
 
@@ -30,7 +49,7 @@ pub async fn fetch_command<C: ApiClient>(
     }
 
     if diff {
-        return fetch_diff(data_access, uid, &dates_to_fetch, verbose).await;
+        return fetch_diff(data_access, uid, &dates_to_fetch, verbose, stats).await;
     }
 
     let pb = utils::create_progress_bar(dates_to_fetch.len() as u64);
@@ -45,10 +64,15 @@ pub async fn fetch_command<C: ApiClient>(
         }
     }
 
+    let mut elapsed_secs = 0.0;
+    let mut bytes = 0u64;
     if !need.is_empty() {
+        crate::api::reset_transfer_stats();
         let start = Instant::now();
+        // --force must hit the network even when cache files already exist.
+        let fetch_access = without_cache(data_access, force);
         workouts::get_jdays_with_callback(
-            data_access,
+            &fetch_access,
             &need,
             workouts::JDAY_BATCH_SIZE,
             workouts::FETCH_CONCURRENCY,
@@ -60,11 +84,14 @@ pub async fn fetch_command<C: ApiClient>(
             },
         )
         .await?;
+        elapsed_secs = start.elapsed().as_secs_f64();
+        let (_requests, received) = crate::api::transfer_stats();
+        bytes = received;
         if verbose {
             eprintln!(
                 "Fetched {} workouts in {:.2}s ({} per request, concurrency {})",
                 need.len(),
-                start.elapsed().as_secs_f64(),
+                elapsed_secs,
                 workouts::JDAY_BATCH_SIZE,
                 workouts::FETCH_CONCURRENCY
             );
@@ -72,6 +99,10 @@ pub async fn fetch_command<C: ApiClient>(
     }
 
     pb.finish_with_message("Done");
+
+    if stats {
+        println!("{}", format_transfer_stats(need.len() as u64, bytes, elapsed_secs));
+    }
 
     Ok(())
 }
@@ -81,15 +112,26 @@ async fn fetch_diff<C: ApiClient>(
     uid: u32,
     dates: &[String],
     verbose: bool,
+    stats: bool,
 ) -> Result<(), String> {
     let pb = utils::create_progress_bar(dates.len() as u64);
     pb.set_message("Fetching");
     let user_wants_kg = workouts::resolve_user_wants_kg(data_access).await;
 
-    let fetched = workouts::get_jdays(data_access, dates, verbose).await?;
+    crate::api::reset_transfer_stats();
+    let start = Instant::now();
+    // Diff compares against the server, so skip local cache for the download.
+    let fetch_access = without_cache(data_access, true);
+    let fetched = workouts::get_jdays(&fetch_access, dates, verbose).await?;
+    let elapsed_secs = start.elapsed().as_secs_f64();
+    let (_requests, bytes) = crate::api::transfer_stats();
     pb.inc(dates.len() as u64);
 
     pb.finish_and_clear();
+
+    if stats {
+        println!("{}", format_transfer_stats(fetched.len() as u64, bytes, elapsed_secs));
+    }
 
     for (date, server_jday) in fetched {
         let local_jday = workouts::lookup_cached_jday(uid, &date, verbose);
@@ -155,6 +197,20 @@ fn parse_file_export(content: &str) -> Result<Vec<(String, models::JDay)>, Strin
     }
 
     Ok(workouts_list)
+}
+
+fn without_cache<'a, C: ApiClient>(
+    data_access: &crate::api::DataAccess<'a, C>,
+    skip_cache: bool,
+) -> crate::api::DataAccess<'a, C> {
+    crate::api::DataAccess {
+        client: data_access.client,
+        token: data_access.token,
+        uid: data_access.uid,
+        use_network: data_access.use_network,
+        use_cache: data_access.use_cache && !skip_cache,
+        write_cache: data_access.write_cache,
+    }
 }
 
 async fn get_dates_to_fetch<C: ApiClient>(
