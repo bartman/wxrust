@@ -489,9 +489,7 @@ pub fn format_table(state: &TableState, filters: &[String], user_wants_kg: bool)
 // ============================================================================
 
 /// Handle the table command
-pub async fn handle_table<C: ApiClient + Clone + Send + Sync + 'static>(
-    client: &C,
-    token: &Option<String>,
+pub async fn handle_table<C: ApiClient>(
     data_access: DataAccess<'_, C>,
     args: &[String],
     dreams: &Vec<String>,
@@ -509,21 +507,23 @@ pub async fn handle_table<C: ApiClient + Clone + Send + Sync + 'static>(
         }
     }
 
-    // Get dates to process
-    let dates = if date_args.is_empty() {
-        // Default: get all dates from cache/server
-        match workouts::get_dates(&data_access, None, None, 10000, false).await {
-            Ok(d) => d,
-            Err(e) => {
-                utils::exit_with_error(format!("Failed to get dates: {}", e));
-            }
+    // Date listing and unit preference can overlap (jrange vs cached/getSession).
+    let dates_fut = async {
+        if date_args.is_empty() {
+            workouts::get_dates(&data_access, None, None, 10000, false).await
+        } else {
+            workouts::get_dates_from_ranges(&data_access, &date_args).await
         }
-    } else {
-        match workouts::get_dates_from_ranges(&data_access, &date_args).await {
-            Ok(d) => d,
-            Err(e) => {
-                utils::exit_with_error(format!("Failed to get dates from ranges: {}", e));
-            }
+    };
+    let (dates_result, user_wants_kg) = tokio::join!(
+        dates_fut,
+        workouts::resolve_user_wants_kg(&data_access),
+    );
+
+    let dates = match dates_result {
+        Ok(d) => d,
+        Err(e) => {
+            utils::exit_with_error(format!("Failed to get dates: {}", e));
         }
     };
 
@@ -540,49 +540,17 @@ pub async fn handle_table<C: ApiClient + Clone + Send + Sync + 'static>(
         }
     }
 
-    // Fetch workouts asynchronously (like handle_list)
-    let user_wants_kg = workouts::resolve_user_wants_kg(&data_access).await;
-    let (tx, mut rx) = tokio::sync::mpsc::channel(32);
-
-    for date in dates.iter() {
-        let date = date.clone();
-        let client_clone = client.clone();
-        let token_clone = token.clone();
-        let use_network = data_access.use_network;
-        let use_cache = data_access.use_cache;
-        let write_cache = data_access.write_cache;
-        let uid = data_access.uid;
-        let tx_clone = tx.clone();
-        //let verbose = verbose;
-
-        tokio::spawn(async move {
-            let data_access_clone = crate::api::DataAccess {
-                client: &client_clone,
-                token: token_clone.as_deref(),
-                uid,
-                use_network,
-                use_cache,
-                write_cache,
-            };
-            let result = match workouts::get_jday(&data_access_clone, &date, verbose).await {
-                Ok(jday) => Some(jday),
-                Err(e) => {
-                    if verbose {
-                        eprintln!("Error getting workout for {}: {}", date, e);
-                    }
-                    None
-                }
-            };
-            let _ = tx_clone.send((date.clone(), result)).await;
-        });
-    }
-    drop(tx);
-
-    // Collect results and process in date order for deterministic PR tracking
-    let mut results = Vec::new();
-    while let Some(result) = rx.recv().await {
-        results.push(result);
-    }
+    // Cached dates stay local; missing dates are fetched in batched concurrent jday requests.
+    let fetched = match workouts::get_jdays(&data_access, &dates, verbose).await {
+        Ok(v) => v,
+        Err(e) => {
+            utils::exit_with_error(format!("Failed to get workouts: {}", e));
+        }
+    };
+    let mut results: Vec<(String, Option<JDay>)> = fetched
+        .into_iter()
+        .map(|(date, jday)| (date, Some(jday)))
+        .collect();
 
     // Process each dream
     for dream in dreams {

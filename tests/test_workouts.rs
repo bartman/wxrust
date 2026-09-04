@@ -281,6 +281,56 @@ async fn test_get_dates_success() {
 }
 
 #[tokio::test]
+async fn test_get_dates_bounded_range() {
+    let _guard = ENV_MUTEX.lock().await;
+    let temp_dir = TempDir::new().unwrap();
+    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
+    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+
+    let mut mock_client = MockApiClient::new();
+    mock_client
+        .expect_graphql_request::<wxrust::models::GetJRangeData>()
+        .times(1)
+        .returning(|_, _, _| {
+            Ok(GraphQLResponse {
+                data: Some(wxrust::models::GetJRangeData {
+                    jrange: Some(wxrust::models::JRangeData {
+                        days: Some(vec![wxrust::models::JRangeDayData {
+                            on: Some("2023-10-01".to_string()),
+                        }]),
+                    }),
+                }),
+                errors: None,
+            })
+        });
+
+    let data_access = wxrust::api::DataAccess {
+        client: &mock_client,
+        token: Some("token"),
+        uid: Some(123),
+        use_network: true,
+        use_cache: true,
+        write_cache: true,
+    };
+
+    let result = get_dates(
+        &data_access,
+        Some("2023-10-01".to_string()),
+        Some("2023-10-01".to_string()),
+        1,
+        false,
+    ).await;
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), vec!["2023-10-01".to_string()]);
+
+    if let Ok(original) = original_xdg_cache {
+        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+    } else {
+        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+    }
+}
+
+#[tokio::test]
 async fn test_get_dates_invalid_token() {
     let _guard = ENV_MUTEX.lock().await;
     // Set up test cache directory

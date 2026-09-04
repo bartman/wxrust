@@ -105,6 +105,8 @@ Display a progression table showing personal records (PRs) over time for specifi
 - Filter by date range: `wxrust table 2025`
 - Combine date and exercise filters: `wxrust table 2025 deadlift`
 
+`table` (and `heatmap` / filtered `list`) list dates with concurrent `jrange` windows, then load workouts through the same batched `jday` path as `fetch`. Cached days stay local; `--no-network` skips the date listing round-trip entirely.
+
 Arguments are automatically classified as dates or exercise filters:
 - **Date formats**: `YYYY`, `YYYY-MM`, `YYYY.MM`, `YYYYMM`, `YYYY-MM-DD`, `YYYY.MM.DD`, `YYYYMMDD`
 - **Everything else**: Treated as exercise name filter (case-insensitive substring match)
@@ -182,4 +184,4 @@ wxrust --color never list --summary --count 1
 
 ## API Details
 
-Interacts with WeightXReps GraphQL API at `https://weightxreps.net/api/graphql`. Uses `login` mutation for auth, `jrange` query for date ranges, and `JDay` query for individual workouts. Supports efficient connection reuse for multiple requests.
+Interacts with WeightXReps GraphQL API at `https://weightxreps.net/api/graphql`. Uses `login` mutation for auth, `jrange` query for date ranges (up to 32 weeks per request; bounded ranges fire independent windows concurrently), and `JDay` query for individual workouts (up to 10 dates per request, 8 requests in flight). Cached unit preference avoids an extra `getSession` on every run. Supports efficient connection reuse for multiple requests.

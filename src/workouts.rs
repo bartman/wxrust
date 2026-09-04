@@ -2,7 +2,7 @@ use crate::api;
 use crate::formatters;
 use crate::models;
 use crate::parsers;
-use chrono::{Datelike, Utc};
+use chrono::{Datelike, Duration, NaiveDate, Utc};
 use futures::StreamExt;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
@@ -14,6 +14,18 @@ use std::sync::Mutex;
 pub const JDAY_BATCH_SIZE: usize = 10;
 /// Maximum number of batched GraphQL requests in flight during a bulk fetch.
 pub const FETCH_CONCURRENCY: usize = 8;
+/// `jrange.range` is weeks; the API rejects values above this (32 weeks ≈ 224 days).
+pub const JRANGE_MAX_WEEKS: i32 = 32;
+
+const JRANGE_QUERY: &str = r#"
+query GetJRange($uid: ID!, $ymd: YMD!, $range: Int!) {
+  jrange(uid: $uid, ymd: $ymd, range: $range) {
+    days {
+      on
+    }
+  }
+}
+"#;
 
 const JDAY_FIELDS: &str = r#"    log
     bw
@@ -135,6 +147,49 @@ pub fn jday_alias(index: usize) -> String {
 pub fn chunk_dates(dates: &[String], batch_size: usize) -> Vec<Vec<String>> {
     let batch_size = batch_size.max(1);
     dates.chunks(batch_size).map(|c| c.to_vec()).collect()
+}
+
+fn parse_ymd(s: &str) -> Option<NaiveDate> {
+    NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()
+}
+
+fn ymd_from_jrange_on(d: &str) -> Option<String> {
+    if d.len() >= 10 {
+        Some(format!("{}-{}-{}", &d[0..4], &d[5..7], &d[8..10]))
+    } else {
+        None
+    }
+}
+
+fn dates_from_jrange_days(days: Vec<models::JRangeDayData>) -> Vec<String> {
+    days.into_iter()
+        .filter_map(|day| day.on)
+        .filter_map(|d| ymd_from_jrange_on(&d))
+        .collect()
+}
+
+/// Split `[oldest, latest]` into `jrange` windows of at most `JRANGE_MAX_WEEKS`.
+///
+/// `jrange(ymd, range)` returns days between `ymd - range*7` and `ymd`.
+/// Adjacent windows overlap by one day so a boundary workout cannot be missed.
+pub fn jrange_windows(oldest: NaiveDate, latest: NaiveDate) -> Vec<(String, i32)> {
+    if latest < oldest {
+        return vec![];
+    }
+    let mut windows = Vec::new();
+    let mut end = latest;
+    loop {
+        let days = (end - oldest).num_days() + 1;
+        let weeks = (((days + 6) / 7) as i32).clamp(1, JRANGE_MAX_WEEKS);
+        windows.push((end.format("%Y-%m-%d").to_string(), weeks));
+        let covered_start = end - Duration::days(weeks as i64 * 7);
+        if covered_start <= oldest {
+            break;
+        }
+        // Overlap the boundary day; the next window ends on this window's start.
+        end = covered_start;
+    }
+    windows
 }
 
 pub fn build_jday_query(uid: u32, date: &str) -> String {
@@ -416,12 +471,79 @@ where
     Ok(ordered)
 }
 
+async fn fetch_jrange<C: crate::api::ApiClient>(
+    data_access: &crate::api::DataAccess<'_, C>,
+    uid: u32,
+    token: &str,
+    ymd: &str,
+    range: i32,
+) -> Result<Vec<String>, String> {
+    let variables = serde_json::json!({ "uid": uid.to_string(), "ymd": ymd, "range": range });
+    let response: models::GraphQLResponse<models::GetJRangeData> =
+        api::graphql_request(data_access.client, token, JRANGE_QUERY, Some(variables))
+            .await
+            .map_err(|e| e.to_string())?;
+
+    if let Some(errors) = response.errors {
+        return Err(errors.into_iter().map(|e| e.message).collect::<Vec<_>>().join("; "));
+    }
+
+    let days = if let Some(data) = response.data {
+        if let Some(jrange) = data.jrange {
+            jrange.days.unwrap_or_default()
+        } else {
+            vec![]
+        }
+    } else {
+        return Err("Unexpected response.".to_string());
+    };
+
+    Ok(dates_from_jrange_days(days))
+}
+
+/// Fetch workout dates covering `[oldest, latest]` with concurrent `jrange` windows.
+async fn fetch_jrange_windows<C: crate::api::ApiClient>(
+    data_access: &crate::api::DataAccess<'_, C>,
+    oldest: NaiveDate,
+    latest: NaiveDate,
+) -> Result<Vec<String>, String> {
+    let uid = data_access.uid.ok_or("No user ID available")?;
+    let token = data_access.token.ok_or("No token available for network request")?;
+    let windows = jrange_windows(oldest, latest);
+    if windows.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let concurrency = FETCH_CONCURRENCY.max(1);
+    let mut stream = futures::stream::iter(windows)
+        .map(|(ymd, range)| async move { fetch_jrange(data_access, uid, token, &ymd, range).await })
+        .buffer_unordered(concurrency);
+
+    let mut all_dates: Vec<String> = Vec::new();
+    while let Some(result) = stream.next().await {
+        all_dates.extend(result?);
+    }
+
+    all_dates.sort();
+    all_dates.dedup();
+    let oldest_s = oldest.format("%Y-%m-%d").to_string();
+    let latest_s = latest.format("%Y-%m-%d").to_string();
+    Ok(filter_dates_by_range(all_dates, Some(&oldest_s), Some(&latest_s)))
+}
+
 pub async fn get_dates<C: crate::api::ApiClient>(data_access: &crate::api::DataAccess<'_, C>, latest: Option<String>, oldest: Option<String>, count: u32, reverse: bool) -> Result<Vec<String>, String> {
     let uid = data_access.uid.ok_or("No user ID available")?;
-    let client = data_access.client;
 
     if !data_access.use_network {
         return get_dates_from_cache(uid, latest, oldest, count, reverse);
+    }
+
+    // Bounded ranges can be covered by independent jrange windows in parallel.
+    if let (Some(latest_s), Some(oldest_s)) = (latest.as_deref(), oldest.as_deref())
+        && let (Some(latest_d), Some(oldest_d)) = (parse_ymd(latest_s), parse_ymd(oldest_s))
+    {
+        let dates = fetch_jrange_windows(data_access, oldest_d, latest_d).await?;
+        return Ok(limit_and_sort_dates(dates, count, reverse));
     }
 
     let token = data_access.token.ok_or("No token available for network request")?;
@@ -431,45 +553,17 @@ pub async fn get_dates<C: crate::api::ApiClient>(data_access: &crate::api::DataA
         format!("{:04}-{:02}-{:02}", today.year(), today.month(), today.day())
     });
 
-    let query = r#"
-query GetJRange($uid: ID!, $ymd: YMD!, $range: Int!) {
-  jrange(uid: $uid, ymd: $ymd, range: $range) {
-    days {
-      on
-    }
-  }
-}
-"#;
-
     let mut all_dates: Vec<String> = Vec::new();
     let mut current_ymd = initial_ymd.clone();
 
     loop {
-        let want = (count as usize) - all_dates.len();
-        let batch_size = std::cmp::min(32, want);
-
-        let variables = serde_json::json!({ "uid": uid.to_string(), "ymd": current_ymd.clone(), "range": batch_size });
-
-        let response: models::GraphQLResponse<models::GetJRangeData> = api::graphql_request(client, token, query, Some(variables)).await.map_err(|e| e.to_string())?;
-
-        if let Some(errors) = response.errors {
-            return Err(errors.into_iter().map(|e| e.message).collect::<Vec<_>>().join("; "));
+        let want = (count as usize).saturating_sub(all_dates.len());
+        if count > 0 && want == 0 {
+            break;
         }
+        let batch_size = std::cmp::min(JRANGE_MAX_WEEKS as usize, want.max(1));
 
-        let days = if let Some(data) = response.data {
-            if let Some(jrange) = data.jrange {
-                jrange.days.unwrap_or_default()
-            } else {
-                vec![]
-            }
-        } else {
-            return Err("Unexpected response.".to_string());
-        };
-
-        let mut date_strings: Vec<String> = days.into_iter()
-            .filter_map(|day| day.on)
-            .map(|d| format!("{}-{}-{}", &d[0..4], &d[5..7], &d[8..10]))
-            .collect();
+        let mut date_strings = fetch_jrange(data_access, uid, token, &current_ymd, batch_size as i32).await?;
 
         if date_strings.is_empty() {
             break;

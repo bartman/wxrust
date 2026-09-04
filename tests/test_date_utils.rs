@@ -1,5 +1,6 @@
 use chrono::NaiveDate;
 use wxrust::utils::{parse_date_boundary, parse_date_range};
+use wxrust::workouts::{jrange_windows, JRANGE_MAX_WEEKS};
 
 #[test]
 fn test_parse_date_boundary_full_date() {
@@ -172,4 +173,41 @@ fn test_parse_date_range_invalid() {
 
     // Too many parts
     assert!(parse_date_range("2025-05-01..2025-05-31..extra").is_err());
+}
+
+#[test]
+fn test_jrange_windows_same_day() {
+    let day = NaiveDate::from_ymd_opt(2023, 10, 1).unwrap();
+    let windows = jrange_windows(day, day);
+    assert_eq!(windows, vec![("2023-10-01".to_string(), 1)]);
+}
+
+#[test]
+fn test_jrange_windows_empty_when_inverted() {
+    let oldest = NaiveDate::from_ymd_opt(2026, 9, 4).unwrap();
+    let latest = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    assert!(jrange_windows(oldest, latest).is_empty());
+}
+
+#[test]
+fn test_jrange_windows_one_max_window() {
+    let latest = NaiveDate::from_ymd_opt(2026, 9, 4).unwrap();
+    let oldest = latest - chrono::Duration::days(JRANGE_MAX_WEEKS as i64 * 7);
+    let windows = jrange_windows(oldest, latest);
+    assert_eq!(windows.len(), 1);
+    assert_eq!(windows[0].0, "2026-09-04");
+    assert_eq!(windows[0].1, JRANGE_MAX_WEEKS);
+}
+
+#[test]
+fn test_jrange_windows_year_needs_two() {
+    let oldest = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let latest = NaiveDate::from_ymd_opt(2026, 9, 4).unwrap();
+    let windows = jrange_windows(oldest, latest);
+    assert_eq!(windows.len(), 2);
+    assert_eq!(windows[0], ("2026-09-04".to_string(), JRANGE_MAX_WEEKS));
+    assert!(windows[1].1 >= 1 && windows[1].1 <= JRANGE_MAX_WEEKS);
+    // Windows overlap by one day at the first window's start.
+    let first_start = latest - chrono::Duration::days(JRANGE_MAX_WEEKS as i64 * 7);
+    assert_eq!(windows[1].0, first_start.format("%Y-%m-%d").to_string());
 }

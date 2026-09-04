@@ -75,9 +75,7 @@ pub fn compute_metric(jday: &JDay, metric: Metric, filters: &[String]) -> f64 {
 }
 
 /// Handle the heatmap command
-pub async fn handle_heatmap<C: ApiClient + Clone + Send + Sync + 'static>(
-    client: &C,
-    token: &Option<String>,
+pub async fn handle_heatmap<C: ApiClient>(
     data_access: DataAccess<'_, C>,
     metric: Metric,
     green: bool,
@@ -136,61 +134,22 @@ pub async fn handle_heatmap<C: ApiClient + Clone + Send + Sync + 'static>(
         }
     }
 
-    // Fetch workouts asynchronously
-    let (tx, mut rx) = tokio::sync::mpsc::channel(32);
-
-    for date in dates.iter() {
-        let date = date.clone();
-        let client_clone = client.clone();
-        let token_clone = token.clone();
-        let use_network = data_access.use_network;
-        let use_cache = data_access.use_cache;
-        let write_cache = data_access.write_cache;
-        let uid = data_access.uid;
-        let tx_clone = tx.clone();
-
-        tokio::spawn(async move {
-            let data_access_clone = crate::api::DataAccess {
-                client: &client_clone,
-                token: token_clone.as_deref(),
-                uid,
-                use_network,
-                use_cache,
-                write_cache,
-            };
-            let result = match workouts::get_jday(&data_access_clone, &date, verbose).await {
-                Ok(jday) => Some(jday),
-                Err(e) => {
-                    if verbose {
-                        eprintln!("Error getting workout for {}: {}", date, e);
-                    }
-                    None
-                }
-            };
-            let _ = tx_clone.send((date.clone(), result)).await;
-        });
-    }
-    drop(tx);
-
-    // Collect results
-    let mut results = Vec::new();
-    while let Some(result) = rx.recv().await {
-        results.push(result);
-    }
-
-    // Sort by date
-    results.sort_by(|a, b| a.0.cmp(&b.0));
+    let results = match workouts::get_jdays(&data_access, &dates, verbose).await {
+        Ok(v) => v,
+        Err(e) => {
+            utils::exit_with_error(format!("Failed to get workouts: {}", e));
+        }
+    };
 
     // Compute daily metrics
     let mut daily_values: HashMap<NaiveDate, f64> = HashMap::new();
-    for (date_str, jday_opt) in results {
-        if let Some(jday) = jday_opt
-            && let Ok(date) = NaiveDate::parse_from_str(&date_str, "%Y-%m-%d") {
-                let value = compute_metric(&jday, metric, &filters);
-                if value > 0.0 {
-                    daily_values.insert(date, value);
-                }
+    for (date_str, jday) in results {
+        if let Ok(date) = NaiveDate::parse_from_str(&date_str, "%Y-%m-%d") {
+            let value = compute_metric(&jday, metric, &filters);
+            if value > 0.0 {
+                daily_values.insert(date, value);
             }
+        }
     }
 
     if daily_values.is_empty() {
