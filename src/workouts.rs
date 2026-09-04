@@ -247,6 +247,75 @@ pub fn get_dates_from_cache(uid: u32, latest: Option<String>, oldest: Option<Str
     Ok(result)
 }
 
+/// Newest cached workout date for `uid`, if any.
+pub fn latest_cached_date(uid: u32) -> Option<NaiveDate> {
+    let dates = get_dates_from_cache(uid, None, None, 1, false).ok()?;
+    dates.first().and_then(|s| parse_ymd(s))
+}
+
+/// How `get_dates` should combine cache and network listing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DateScan {
+    /// Walk the requested range (or full history) via `jrange`.
+    Full,
+    /// Use cached dates only.
+    CacheOnly,
+    /// Union cached dates with a bounded network scan of `[oldest, latest]`.
+    Hybrid { oldest: NaiveDate, latest: NaiveDate },
+}
+
+/// Decide how to list workout dates given `-s/--scan-days`.
+///
+/// - `scan_days < 0`: full network listing
+/// - `scan_days == 0`: scan from last cached date through `today` (full listing if cache is empty or disabled)
+/// - `scan_days > 0`: scan `[today - scan_days, today]`
+pub fn resolve_date_scan(
+    scan_days: i32,
+    use_cache: bool,
+    last_cached: Option<NaiveDate>,
+    today: NaiveDate,
+    range_oldest: Option<NaiveDate>,
+    range_latest: Option<NaiveDate>,
+) -> DateScan {
+    if scan_days < 0 {
+        return DateScan::Full;
+    }
+
+    if scan_days == 0 && (!use_cache || last_cached.is_none()) {
+        return DateScan::Full;
+    }
+
+    if scan_days == 0 && last_cached.is_some_and(|lc| lc >= today) {
+        return DateScan::CacheOnly;
+    }
+
+    let window_oldest = if scan_days == 0 {
+        last_cached.unwrap_or(today)
+    } else {
+        today
+            .checked_sub_signed(Duration::days(scan_days as i64))
+            .unwrap_or_else(|| NaiveDate::from_ymd_opt(1, 1, 1).unwrap())
+    };
+
+    let mut oldest = window_oldest;
+    let mut latest = today;
+    if let Some(ro) = range_oldest {
+        oldest = oldest.max(ro);
+    }
+    if let Some(rl) = range_latest {
+        latest = latest.min(rl);
+    }
+    if latest > today {
+        latest = today;
+    }
+
+    if latest < oldest {
+        DateScan::CacheOnly
+    } else {
+        DateScan::Hybrid { oldest, latest }
+    }
+}
+
 pub fn lookup_cached_jday(uid: u32, date: &str, verbose: bool) -> Option<models::JDay> {
     if let Some(content) = read_cached_jday_text(uid, date) {
         // Use cached user preference to parse the cached workout

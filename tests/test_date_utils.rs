@@ -1,6 +1,10 @@
-use chrono::NaiveDate;
+use chrono::{Duration, NaiveDate};
 use wxrust::utils::{parse_date_boundary, parse_date_range};
-use wxrust::workouts::{jrange_windows, JRANGE_MAX_WEEKS};
+use wxrust::workouts::{jrange_windows, resolve_date_scan, DateScan, JRANGE_MAX_WEEKS};
+
+fn ymd(y: i32, m: u32, d: u32) -> NaiveDate {
+    NaiveDate::from_ymd_opt(y, m, d).unwrap()
+}
 
 #[test]
 fn test_parse_date_boundary_full_date() {
@@ -210,4 +214,106 @@ fn test_jrange_windows_year_needs_two() {
     // Windows overlap by one day at the first window's start.
     let first_start = latest - chrono::Duration::days(JRANGE_MAX_WEEKS as i64 * 7);
     assert_eq!(windows[1].0, first_start.format("%Y-%m-%d").to_string());
+}
+
+#[test]
+fn test_resolve_date_scan_negative_is_full() {
+    let today = ymd(2026, 9, 4);
+    assert_eq!(
+        resolve_date_scan(-1, true, Some(today), today, None, None),
+        DateScan::Full
+    );
+}
+
+#[test]
+fn test_resolve_date_scan_zero_without_cache_is_full() {
+    let today = ymd(2026, 9, 4);
+    assert_eq!(
+        resolve_date_scan(0, false, Some(today), today, None, None),
+        DateScan::Full
+    );
+    assert_eq!(
+        resolve_date_scan(0, true, None, today, None, None),
+        DateScan::Full
+    );
+}
+
+#[test]
+fn test_resolve_date_scan_zero_skips_when_current() {
+    let today = ymd(2026, 9, 4);
+    assert_eq!(
+        resolve_date_scan(0, true, Some(today), today, None, None),
+        DateScan::CacheOnly
+    );
+}
+
+#[test]
+fn test_resolve_date_scan_zero_since_last_cached() {
+    let today = ymd(2026, 9, 4);
+    let last = ymd(2026, 8, 20);
+    assert_eq!(
+        resolve_date_scan(0, true, Some(last), today, None, None),
+        DateScan::Hybrid { oldest: last, latest: today }
+    );
+}
+
+#[test]
+fn test_resolve_date_scan_seven_days() {
+    let today = ymd(2026, 9, 4);
+    assert_eq!(
+        resolve_date_scan(7, true, Some(today), today, None, None),
+        DateScan::Hybrid {
+            oldest: today - Duration::days(7),
+            latest: today,
+        }
+    );
+}
+
+#[test]
+fn test_resolve_date_scan_seven_without_cache() {
+    let today = ymd(2026, 9, 4);
+    assert_eq!(
+        resolve_date_scan(7, false, None, today, None, None),
+        DateScan::Hybrid {
+            oldest: today - Duration::days(7),
+            latest: today,
+        }
+    );
+}
+
+#[test]
+fn test_resolve_date_scan_window_misses_historical_range() {
+    let today = ymd(2026, 9, 4);
+    let last = ymd(2026, 9, 1);
+    assert_eq!(
+        resolve_date_scan(
+            0,
+            true,
+            Some(last),
+            today,
+            Some(ymd(2020, 1, 1)),
+            Some(ymd(2020, 12, 31)),
+        ),
+        DateScan::CacheOnly
+    );
+}
+
+#[test]
+fn test_resolve_date_scan_intersects_requested_range() {
+    let today = ymd(2026, 9, 4);
+    let last = ymd(2026, 1, 15);
+    assert_eq!(
+        resolve_date_scan(
+            0,
+            true,
+            Some(last),
+            today,
+            Some(ymd(2026, 1, 1)),
+            Some(ymd(2026, 12, 31)),
+        ),
+        DateScan::Hybrid {
+            oldest: last,
+            latest: today,
+        }
+    );
 }
