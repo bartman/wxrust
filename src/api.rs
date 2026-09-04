@@ -2,6 +2,28 @@ use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use ansi_term::Colour;
 use tokio::sync::OnceCell;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static TRANSFER_BYTES: AtomicU64 = AtomicU64::new(0);
+static TRANSFER_REQUESTS: AtomicU64 = AtomicU64::new(0);
+
+pub fn reset_transfer_stats() {
+    TRANSFER_BYTES.store(0, Ordering::Relaxed);
+    TRANSFER_REQUESTS.store(0, Ordering::Relaxed);
+}
+
+/// Returns `(requests, bytes)` recorded since the last reset.
+pub fn transfer_stats() -> (u64, u64) {
+    (
+        TRANSFER_REQUESTS.load(Ordering::Relaxed),
+        TRANSFER_BYTES.load(Ordering::Relaxed),
+    )
+}
+
+fn record_transfer(bytes: usize) {
+    TRANSFER_BYTES.fetch_add(bytes as u64, Ordering::Relaxed);
+    TRANSFER_REQUESTS.fetch_add(1, Ordering::Relaxed);
+}
 
 use crate::models::{GraphQLRequest, GraphQLResponse, WorkoutRequest, WorkoutResponse, UserBasicInfoData, User};
 use crate::formatters::STDERR_COLOR_ENABLED;
@@ -90,6 +112,7 @@ impl ApiClient for ReqwestClient {
             .await?;
         let status = response.status();
         let text = response.text().await?;
+        record_transfer(text.len());
         log_verbose_response(&text, status, self.verbose);
         let body: GraphQLResponse<crate::models::LoginData> = serde_json::from_str(&text)?;
         Ok(body)
@@ -110,6 +133,7 @@ impl ApiClient for ReqwestClient {
             .await?;
         let status = response.status();
         let text = response.text().await?;
+        record_transfer(text.len());
         log_verbose_response(&text, status, self.verbose);
         let body: GraphQLResponse<T> = serde_json::from_str(&text)?;
         Ok(body)
