@@ -80,6 +80,7 @@ async fn test_fetch_command_skips_cached() {
         use_network: false,
         use_cache: true,
         write_cache: false,
+        scan_days: 0,
     };
 
     let dates = vec!["2023-10-01".to_string()];
@@ -132,6 +133,7 @@ async fn test_fetch_command_fetches_and_caches() {
         use_network: true,
         use_cache: false,
         write_cache: false,
+        scan_days: 0,
     };
 
     let dates = vec!["2023-10-01".to_string()];
@@ -160,6 +162,7 @@ async fn test_fetch_command_no_dates() {
         use_network: false,
         use_cache: true,
         write_cache: false,
+        scan_days: 0,
     };
 
     let result = wxrust::fetch::fetch_command(&data_access, &["2023-10-01".to_string()], false, false, None, false, false).await;
@@ -218,6 +221,7 @@ async fn test_fetch_command_force_refetches() {
         use_network: true,
         use_cache: true,
         write_cache: false,
+        scan_days: 0,
     };
 
     let dates = vec!["2023-10-01".to_string()];
@@ -269,6 +273,7 @@ async fn test_fetch_command_without_force_skips_network() {
         use_network: true,
         use_cache: true,
         write_cache: false,
+        scan_days: 0,
     };
 
     let dates = vec!["2023-10-01".to_string()];
@@ -371,6 +376,7 @@ async fn test_fetch_diff_identical_cache_is_ok() {
         use_network: true,
         use_cache: true,
         write_cache: false,
+        scan_days: 0,
     };
 
     let dates = vec!["2023-10-01".to_string()];

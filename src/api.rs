@@ -77,6 +77,8 @@ pub struct DataAccess<'a, C: ApiClient> {
     pub use_network: bool,
     pub use_cache: bool,
     pub write_cache: bool,
+    /// Days to scan for new workout dates (`0` = since last cached, `-1` = full history).
+    pub scan_days: i32,
 }
 
 #[derive(Clone)]

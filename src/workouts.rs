@@ -607,6 +607,45 @@ pub async fn get_dates<C: crate::api::ApiClient>(data_access: &crate::api::DataA
         return get_dates_from_cache(uid, latest, oldest, count, reverse);
     }
 
+    let today = Utc::now().date_naive();
+    let last_cached = if data_access.use_cache {
+        latest_cached_date(uid)
+    } else {
+        None
+    };
+    let range_oldest = oldest.as_deref().and_then(parse_ymd);
+    let range_latest = latest.as_deref().and_then(parse_ymd);
+
+    match resolve_date_scan(
+        data_access.scan_days,
+        data_access.use_cache,
+        last_cached,
+        today,
+        range_oldest,
+        range_latest,
+    ) {
+        DateScan::CacheOnly => {
+            return if data_access.use_cache {
+                get_dates_from_cache(uid, latest, oldest, count, reverse)
+            } else {
+                Ok(vec![])
+            };
+        }
+        DateScan::Hybrid { oldest: scan_oldest, latest: scan_latest } => {
+            let mut dates = if data_access.use_cache {
+                get_dates_from_cache(uid, latest.clone(), oldest.clone(), 0, false)?
+            } else {
+                vec![]
+            };
+            dates.extend(fetch_jrange_windows(data_access, scan_oldest, scan_latest).await?);
+            dates.sort();
+            dates.dedup();
+            let filtered = filter_dates_by_range(dates, oldest.as_deref(), latest.as_deref());
+            return Ok(limit_and_sort_dates(filtered, count, reverse));
+        }
+        DateScan::Full => {}
+    }
+
     // Bounded ranges can be covered by independent jrange windows in parallel.
     if let (Some(latest_s), Some(oldest_s)) = (latest.as_deref(), oldest.as_deref())
         && let (Some(latest_d), Some(oldest_d)) = (parse_ymd(latest_s), parse_ymd(oldest_s))

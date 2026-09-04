@@ -213,6 +213,7 @@ fn without_cache<'a, C: ApiClient>(
         use_network: data_access.use_network,
         use_cache: data_access.use_cache && !skip_cache,
         write_cache: data_access.write_cache,
+        scan_days: data_access.scan_days,
     }
 }
 

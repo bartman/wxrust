@@ -39,6 +39,10 @@ struct Args {
     #[arg(short = 'W', long)]
     no_cache_write: bool,
 
+    /// Days to scan for new workouts (0=since last cached, -1=full history)
+    #[arg(short = 's', long = "scan-days", default_value_t = 0, allow_hyphen_values = true, value_name = "DAYS")]
+    scan_days: i32,
+
     /// When to color output: auto, always, never
     #[arg(long, default_value = "auto")]
     color: String,
@@ -270,6 +274,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if args.no_network && args.no_cache {
         utils::exit_with_error("Error: --no-network and --no-cache are mutually exclusive");
     }
+    if args.scan_days < -1 {
+        utils::exit_with_error("Error: --scan-days must be -1 or greater");
+    }
 
     unsafe { std::env::set_var("WXRUST_COLOR", &args.color); }
 
@@ -314,6 +321,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         use_network: !args.no_network,
         use_cache: !args.no_cache,
         write_cache: !args.no_cache_write,
+        scan_days: args.scan_days,
     };
 
     match args.command {
