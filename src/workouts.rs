@@ -41,8 +41,13 @@ lazy_static! {
     static ref USER_WANTS_KG: Mutex<Option<bool>> = Mutex::new(None);
 }
 
-fn filter_dates_by_range(dates: Vec<String>, oldest: Option<&str>, latest: Option<&str>) -> Vec<String> {
-    dates.into_iter()
+fn filter_dates_by_range(
+    dates: Vec<String>,
+    oldest: Option<&str>,
+    latest: Option<&str>,
+) -> Vec<String> {
+    dates
+        .into_iter()
         .filter(|d| oldest.is_none_or(|old| d.as_str() >= old))
         .filter(|d| latest.is_none_or(|lat| d.as_str() <= lat))
         .collect()
@@ -64,10 +69,16 @@ pub fn get_cache_base_dir() -> Result<PathBuf, String> {
         if !dir.is_empty() {
             PathBuf::from(dir)
         } else {
-            std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".cache")).ok_or("No cache dir")?
+            std::env::var("HOME")
+                .ok()
+                .map(|h| PathBuf::from(h).join(".cache"))
+                .ok_or("No cache dir")?
         }
     } else {
-        std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".cache")).ok_or("No cache dir")?
+        std::env::var("HOME")
+            .ok()
+            .map(|h| PathBuf::from(h).join(".cache"))
+            .ok_or("No cache dir")?
     };
     Ok(cache_dir.join("wxrust"))
 }
@@ -83,7 +94,7 @@ pub fn read_cached_user_wants_kg() -> Option<bool> {
                 None
             } else {
                 let content = fs::read_to_string(&file_path).ok()?;
-//eprintln!("#### RD {:?} -> {}", file_path, content.trim());
+                //eprintln!("#### RD {:?} -> {}", file_path, content.trim());
                 match content.trim() {
                     "0" => Some(false),
                     "1" => Some(true),
@@ -95,7 +106,7 @@ pub fn read_cached_user_wants_kg() -> Option<bool> {
             }
         };
     }
-//eprintln!("#### RD cache -> {:?}", *guard);
+    //eprintln!("#### RD cache -> {:?}", *guard);
     *guard
 }
 
@@ -117,7 +128,7 @@ pub fn write_cached_user_wants_kg(value: bool) {
             let _ = fs::rename(&temp_path, &file_path);
         }
     }
-//eprintln!("#### WR cache <- {}", value);
+    //eprintln!("#### WR cache <- {}", value);
     *USER_WANTS_KG.lock().unwrap() = Some(value);
 }
 
@@ -137,7 +148,9 @@ fn get_cache_file_path(uid: u32, date: &str) -> Result<PathBuf, String> {
 
 /// True if a cache file exists for this uid/date (does not parse the contents).
 pub fn cached_jday_exists(uid: u32, date: &str) -> bool {
-    get_cache_file_path(uid, date).map(|p| p.exists()).unwrap_or(false)
+    get_cache_file_path(uid, date)
+        .map(|p| p.exists())
+        .unwrap_or(false)
 }
 
 pub fn jday_alias(index: usize) -> String {
@@ -214,28 +227,39 @@ pub fn build_batch_jday_query(uid: u32, dates: &[String]) -> String {
     q
 }
 
-pub fn get_dates_from_cache(uid: u32, latest: Option<String>, oldest: Option<String>, count: u32, reverse: bool) -> Result<Vec<String>, String> {
+pub fn get_dates_from_cache(
+    uid: u32,
+    latest: Option<String>,
+    oldest: Option<String>,
+    count: u32,
+    reverse: bool,
+) -> Result<Vec<String>, String> {
     let cache_dir = get_cache_dir(uid)?;
     if !cache_dir.exists() {
         return Ok(vec![]);
     }
 
     let mut dates: Vec<String> = vec![];
-    let entries = fs::read_dir(&cache_dir).map_err(|e| format!("Failed to read cache dir: {}", e))?;
+    let entries =
+        fs::read_dir(&cache_dir).map_err(|e| format!("Failed to read cache dir: {}", e))?;
 
     for entry in entries {
         let entry = entry.map_err(|e| format!("Failed to read dir entry: {}", e))?;
         let path = entry.path();
         if path.is_file()
             && let Some(ext) = path.extension()
-                && ext == "txt"
-                    && let Some(stem) = path.file_stem()
-                        && let Some(date_str) = stem.to_str() {
-                            // Basic validation: should be YYYY-MM-DD format
-                            if date_str.len() == 10 && date_str.chars().nth(4) == Some('-') && date_str.chars().nth(7) == Some('-') {
-                                dates.push(date_str.to_string());
-                            }
-                        }
+            && ext == "txt"
+            && let Some(stem) = path.file_stem()
+            && let Some(date_str) = stem.to_str()
+        {
+            // Basic validation: should be YYYY-MM-DD format
+            if date_str.len() == 10
+                && date_str.chars().nth(4) == Some('-')
+                && date_str.chars().nth(7) == Some('-')
+            {
+                dates.push(date_str.to_string());
+            }
+        }
     }
 
     // Sort dates
@@ -247,23 +271,101 @@ pub fn get_dates_from_cache(uid: u32, latest: Option<String>, oldest: Option<Str
     Ok(result)
 }
 
+/// Newest cached workout date for `uid`, if any.
+pub fn latest_cached_date(uid: u32) -> Option<NaiveDate> {
+    let dates = get_dates_from_cache(uid, None, None, 1, false).ok()?;
+    dates.first().and_then(|s| parse_ymd(s))
+}
+
+/// How `get_dates` should combine cache and network listing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DateScan {
+    /// Walk the requested range (or full history) via `jrange`.
+    Full,
+    /// Use cached dates only.
+    CacheOnly,
+    /// Union cached dates with a bounded network scan of `[oldest, latest]`.
+    Hybrid {
+        oldest: NaiveDate,
+        latest: NaiveDate,
+    },
+}
+
+/// Decide how to list workout dates given `-s/--scan-days`.
+///
+/// - `scan_days < 0`: full network listing
+/// - `scan_days == 0`: scan from last cached date through `today` (full listing if cache is empty or disabled)
+/// - `scan_days > 0`: scan `[today - scan_days, today]`
+pub fn resolve_date_scan(
+    scan_days: i32,
+    use_cache: bool,
+    last_cached: Option<NaiveDate>,
+    today: NaiveDate,
+    range_oldest: Option<NaiveDate>,
+    range_latest: Option<NaiveDate>,
+) -> DateScan {
+    if scan_days < 0 {
+        return DateScan::Full;
+    }
+
+    if scan_days == 0 && (!use_cache || last_cached.is_none()) {
+        return DateScan::Full;
+    }
+
+    if scan_days == 0 && last_cached.is_some_and(|lc| lc >= today) {
+        return DateScan::CacheOnly;
+    }
+
+    let window_oldest = if scan_days == 0 {
+        last_cached.unwrap_or(today)
+    } else {
+        today
+            .checked_sub_signed(Duration::days(scan_days as i64))
+            .unwrap_or_else(|| NaiveDate::from_ymd_opt(1, 1, 1).unwrap())
+    };
+
+    let mut oldest = window_oldest;
+    let mut latest = today;
+    if let Some(ro) = range_oldest {
+        oldest = oldest.max(ro);
+    }
+    if let Some(rl) = range_latest {
+        latest = latest.min(rl);
+    }
+    if latest > today {
+        latest = today;
+    }
+
+    if latest < oldest {
+        DateScan::CacheOnly
+    } else {
+        DateScan::Hybrid { oldest, latest }
+    }
+}
+
 pub fn lookup_cached_jday(uid: u32, date: &str, verbose: bool) -> Option<models::JDay> {
     if let Some(content) = read_cached_jday_text(uid, date) {
         // Use cached user preference to parse the cached workout
         let user_wants_kg = read_cached_user_wants_kg_or(true);
         let options = parsers::ParserOptions::new(user_wants_kg);
         if let Ok(jday) = parsers::parse_workout_with_options(&content, &options) {
-            if verbose
-                && let Ok(cache_path) = get_cache_file_path(uid, date) {
-                    eprintln!("\x1b[34mgetting {} from cache {}\x1b[0m", date, cache_path.display());
-                }
+            if verbose && let Ok(cache_path) = get_cache_file_path(uid, date) {
+                eprintln!(
+                    "\x1b[34mgetting {} from cache {}\x1b[0m",
+                    date,
+                    cache_path.display()
+                );
+            }
             return Some(jday);
         }
 
-        if verbose
-            && let Ok(cache_path) = get_cache_file_path(uid, date) {
-                eprintln!("\x1b[34mfailed parsing {} from cache {}\x1b[0m", date, cache_path.display());
-            }
+        if verbose && let Ok(cache_path) = get_cache_file_path(uid, date) {
+            eprintln!(
+                "\x1b[34mfailed parsing {} from cache {}\x1b[0m",
+                date,
+                cache_path.display()
+            );
+        }
     }
     None
 }
@@ -294,28 +396,45 @@ pub fn write_cached_jday(uid: u32, date: &str, jday: &models::JDay) {
 }
 
 #[allow(unreachable_code)]
-pub async fn get_jday<C: crate::api::ApiClient>(data_access: &crate::api::DataAccess<'_, C>, date: &str, verbose: bool) -> Result<models::JDay, String> {
+pub async fn get_jday<C: crate::api::ApiClient>(
+    data_access: &crate::api::DataAccess<'_, C>,
+    date: &str,
+    verbose: bool,
+) -> Result<models::JDay, String> {
     let uid = data_access.uid.ok_or("No user ID available")?;
     let client = data_access.client;
 
     // Check cache if allowed
     if data_access.use_cache
-        && let Some(jday) = lookup_cached_jday(uid, date, verbose) {
-            return Ok(jday);
-        }
-
-    if !data_access.use_network {
-        return Err(format!("No workout found for {} (network access disabled)", date));
+        && let Some(jday) = lookup_cached_jday(uid, date, verbose)
+    {
+        return Ok(jday);
     }
 
-    let token = data_access.token.ok_or("No token available for network request")?;
+    if !data_access.use_network {
+        return Err(format!(
+            "No workout found for {} (network access disabled)",
+            date
+        ));
+    }
+
+    let token = data_access
+        .token
+        .ok_or("No token available for network request")?;
 
     let query = build_jday_query(uid, date);
 
-    let response: models::GraphQLResponse<models::WorkoutData> = api::graphql_request(client, token, &query, None).await.map_err(|e| e.to_string())?;
+    let response: models::GraphQLResponse<models::WorkoutData> =
+        api::graphql_request(client, token, &query, None)
+            .await
+            .map_err(|e| e.to_string())?;
 
     if let Some(errors) = response.errors {
-        return Err(errors.into_iter().map(|e| e.message).collect::<Vec<_>>().join("; "));
+        return Err(errors
+            .into_iter()
+            .map(|e| e.message)
+            .collect::<Vec<_>>()
+            .join("; "));
     }
 
     if let Some(data) = response.data {
@@ -340,7 +459,9 @@ async fn fetch_jdays_from_network<C: crate::api::ApiClient>(
     dates: &[String],
     _verbose: bool,
 ) -> Result<Vec<(String, models::JDay)>, String> {
-    let token = data_access.token.ok_or("No token available for network request")?;
+    let token = data_access
+        .token
+        .ok_or("No token available for network request")?;
     let query = build_batch_jday_query(uid, dates);
     let response: models::GraphQLResponse<models::BatchJDayData> =
         api::graphql_request(data_access.client, token, &query, None)
@@ -348,10 +469,16 @@ async fn fetch_jdays_from_network<C: crate::api::ApiClient>(
             .map_err(|e| e.to_string())?;
 
     if let Some(errors) = response.errors {
-        return Err(errors.into_iter().map(|e| e.message).collect::<Vec<_>>().join("; "));
+        return Err(errors
+            .into_iter()
+            .map(|e| e.message)
+            .collect::<Vec<_>>()
+            .join("; "));
     }
 
-    let mut data = response.data.ok_or_else(|| "Unexpected response.".to_string())?;
+    let mut data = response
+        .data
+        .ok_or_else(|| "Unexpected response.".to_string())?;
     let mut results = Vec::with_capacity(dates.len());
     for (i, date) in dates.iter().enumerate() {
         let key = jday_alias(i);
@@ -393,7 +520,10 @@ pub async fn get_jdays_batch<C: crate::api::ApiClient>(
 
     if !missing.is_empty() {
         if !data_access.use_network {
-            return Err(format!("No workout found for {} (network access disabled)", missing[0]));
+            return Err(format!(
+                "No workout found for {} (network access disabled)",
+                missing[0]
+            ));
         }
         let fetched = fetch_jdays_from_network(data_access, uid, &missing, verbose).await?;
         for (date, jday) in fetched {
@@ -485,7 +615,11 @@ async fn fetch_jrange<C: crate::api::ApiClient>(
             .map_err(|e| e.to_string())?;
 
     if let Some(errors) = response.errors {
-        return Err(errors.into_iter().map(|e| e.message).collect::<Vec<_>>().join("; "));
+        return Err(errors
+            .into_iter()
+            .map(|e| e.message)
+            .collect::<Vec<_>>()
+            .join("; "));
     }
 
     let days = if let Some(data) = response.data {
@@ -508,7 +642,9 @@ async fn fetch_jrange_windows<C: crate::api::ApiClient>(
     latest: NaiveDate,
 ) -> Result<Vec<String>, String> {
     let uid = data_access.uid.ok_or("No user ID available")?;
-    let token = data_access.token.ok_or("No token available for network request")?;
+    let token = data_access
+        .token
+        .ok_or("No token available for network request")?;
     let windows = jrange_windows(oldest, latest);
     if windows.is_empty() {
         return Ok(vec![]);
@@ -528,14 +664,66 @@ async fn fetch_jrange_windows<C: crate::api::ApiClient>(
     all_dates.dedup();
     let oldest_s = oldest.format("%Y-%m-%d").to_string();
     let latest_s = latest.format("%Y-%m-%d").to_string();
-    Ok(filter_dates_by_range(all_dates, Some(&oldest_s), Some(&latest_s)))
+    Ok(filter_dates_by_range(
+        all_dates,
+        Some(&oldest_s),
+        Some(&latest_s),
+    ))
 }
 
-pub async fn get_dates<C: crate::api::ApiClient>(data_access: &crate::api::DataAccess<'_, C>, latest: Option<String>, oldest: Option<String>, count: u32, reverse: bool) -> Result<Vec<String>, String> {
+pub async fn get_dates<C: crate::api::ApiClient>(
+    data_access: &crate::api::DataAccess<'_, C>,
+    latest: Option<String>,
+    oldest: Option<String>,
+    count: u32,
+    reverse: bool,
+) -> Result<Vec<String>, String> {
     let uid = data_access.uid.ok_or("No user ID available")?;
 
     if !data_access.use_network {
         return get_dates_from_cache(uid, latest, oldest, count, reverse);
+    }
+
+    let today = Utc::now().date_naive();
+    let last_cached = if data_access.use_cache {
+        latest_cached_date(uid)
+    } else {
+        None
+    };
+    let range_oldest = oldest.as_deref().and_then(parse_ymd);
+    let range_latest = latest.as_deref().and_then(parse_ymd);
+
+    match resolve_date_scan(
+        data_access.scan_days,
+        data_access.use_cache,
+        last_cached,
+        today,
+        range_oldest,
+        range_latest,
+    ) {
+        DateScan::CacheOnly => {
+            return if data_access.use_cache {
+                get_dates_from_cache(uid, latest, oldest, count, reverse)
+            } else {
+                Ok(vec![])
+            };
+        }
+        DateScan::Hybrid {
+            oldest: scan_oldest,
+            latest: scan_latest,
+        } => {
+            let mut dates = if data_access.use_cache {
+                get_dates_from_cache(uid, latest.clone(), oldest.clone(), 0, false)?
+            } else {
+                vec![]
+            };
+            dates.extend(fetch_jrange_windows(data_access, scan_oldest, scan_latest).await?);
+            dates.sort();
+            dates.dedup();
+            let filtered = filter_dates_by_range(dates, oldest.as_deref(), latest.as_deref());
+            return Ok(limit_and_sort_dates(filtered, count, reverse));
+        }
+        DateScan::Full => {}
     }
 
     // Bounded ranges can be covered by independent jrange windows in parallel.
@@ -546,11 +734,18 @@ pub async fn get_dates<C: crate::api::ApiClient>(data_access: &crate::api::DataA
         return Ok(limit_and_sort_dates(dates, count, reverse));
     }
 
-    let token = data_access.token.ok_or("No token available for network request")?;
+    let token = data_access
+        .token
+        .ok_or("No token available for network request")?;
 
     let initial_ymd = latest.clone().unwrap_or_else(|| {
         let today = Utc::now().date_naive();
-        format!("{:04}-{:02}-{:02}", today.year(), today.month(), today.day())
+        format!(
+            "{:04}-{:02}-{:02}",
+            today.year(),
+            today.month(),
+            today.day()
+        )
     });
 
     let mut all_dates: Vec<String> = Vec::new();
@@ -563,7 +758,8 @@ pub async fn get_dates<C: crate::api::ApiClient>(data_access: &crate::api::DataA
         }
         let batch_size = std::cmp::min(JRANGE_MAX_WEEKS as usize, want.max(1));
 
-        let mut date_strings = fetch_jrange(data_access, uid, token, &current_ymd, batch_size as i32).await?;
+        let mut date_strings =
+            fetch_jrange(data_access, uid, token, &current_ymd, batch_size as i32).await?;
 
         if date_strings.is_empty() {
             break;
@@ -573,7 +769,8 @@ pub async fn get_dates<C: crate::api::ApiClient>(data_access: &crate::api::DataA
 
         let date_count_before = all_dates.len();
 
-        let filtered = filter_dates_by_range(date_strings.clone(), oldest.as_deref(), latest.as_deref());
+        let filtered =
+            filter_dates_by_range(date_strings.clone(), oldest.as_deref(), latest.as_deref());
         all_dates.extend(filtered);
 
         // Remove duplicates and sort
@@ -593,9 +790,10 @@ pub async fn get_dates<C: crate::api::ApiClient>(data_access: &crate::api::DataA
         // Check if we reached the oldest
         if let Some(old) = &oldest
             && let Some(batch_oldest) = date_strings.first()
-                && batch_oldest < old {
-                    break;
-                }
+            && batch_oldest < old
+        {
+            break;
+        }
 
         // Set next ymd to the oldest in this batch to get older dates
         if let Some(oldest_in_batch) = date_strings.first() {
@@ -636,7 +834,15 @@ pub async fn get_dates_from_ranges<C: crate::api::ApiClient>(
 
         // limit the query to the number of days in the range
         let count = ((oldest - latest).num_days().abs() + 1) as u32;
-        let dates = match get_dates(data_access, Some(latest.to_string()), Some(oldest.to_string()), count, false).await {
+        let dates = match get_dates(
+            data_access,
+            Some(latest.to_string()),
+            Some(oldest.to_string()),
+            count,
+            false,
+        )
+        .await
+        {
             Ok(d) => d,
             Err(e) => return Err(e),
         };

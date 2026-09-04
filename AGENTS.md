@@ -34,7 +34,7 @@ decodes the JWT token for user ID, queries the GraphQL API for workout data, and
   - Weights: #FF7900 (255,121,0)
   - Reps: #00BBF9 (0,187,249)
   - Sets: #F15BB5 (241,91,181)
-- **Performance**: Reuse HTTP client across requests to maintain connection pooling and avoid TCP overhead. Session-level caching of user preferences (`user_wants_kg`); `getSession` is lazy, not on every command. Fetch packs up to 10 `jday` queries per GraphQL request (aliases) and runs 8 requests concurrently (`JDAY_BATCH_SIZE=10`, `FETCH_CONCURRENCY=8`). Bounded `jrange` listing (`get_dates` with both oldest and latest, e.g. `table deadlift 2026`) splits the span into independent 32-week windows and fetches them concurrently (`jrange_windows`). `table` / `heatmap` / filtered `list` load workout bodies via `get_jdays` (cache hits stay local; misses use the same batched path as `fetch`) instead of one GraphQL request per date. Sequential `jday` fetching of 152 workouts took ~19s; batched+concurrent takes ~1.2s for the workout downloads. Network slowness on a warm cache is date listing + auth, not parsing. HTTP client uses a larger idle pool, TCP_NODELAY, and gzip.
+- **Performance**: Reuse HTTP client across requests to maintain connection pooling and avoid TCP overhead. Session-level caching of user preferences (`user_wants_kg`); `getSession` is lazy, not on every command. Fetch packs up to 10 `jday` queries per GraphQL request (aliases) and runs 8 requests concurrently (`JDAY_BATCH_SIZE=10`, `FETCH_CONCURRENCY=8`). Date listing (`get_dates`) defaults to `-s 0`: cache filenames plus a bounded `jrange` from the last cached date through today (`resolve_date_scan` / `DateScan::{Full,CacheOnly,Hybrid}`). `-s -1` restores a full network listing; bounded ranges then use concurrent 32-week windows (`jrange_windows`). `table` / `heatmap` / filtered `list` load workout bodies via `get_jdays` (cache hits stay local; misses use the same batched path as `fetch`) instead of one GraphQL request per date. Sequential `jday` fetching of 152 workouts took ~19s; batched+concurrent takes ~1.2s for the workout downloads. With a warm cache and default `-s 0`, `table deadlift` stays local (sub-1s); the old 40s cost was unbounded sequential `jrange`. HTTP client uses a larger idle pool, TCP_NODELAY, and gzip.
 - **Rust Implementation**: Used reqwest for HTTP with client reuse, serde for JSON, base64 for JWT decoding, ansi_term for colors, atty for TTY detection. Handled GraphQL responses, error checking, and inline color application during text generation.
 
 ## Referenced Links
@@ -83,6 +83,7 @@ You can look in `weightxreps-client/src/data/generated---db-types-and-hooks.tsx`
 - Optional body weight line in workout parsing; workouts without "@ <number> bw" are allowed and set bw to None
 - Robust workout parsing that treats invalid exercise blocks (lone # or #exercise with no valid sets) as comments
 - Data access control options: `--force-authentication` (`-a`), `--no-network` (`-N`), `--no-cache` (`-C`), `--no-cache-write` (`-W`) for flexible offline/online operation modes
+- **`-s/--scan-days`** (default `0`): how many days to network-scan for new workout dates before using the cache date list. Must appear before the subcommand (`wxrust -s 7 table deadlift`); `list`/`show` `-s` is `--summary`. `-s 0` scans since the last cached date (skips the network if that date is today); `-s N` scans `[today-N, today]`; `-s -1` is the old full-history `jrange` walk. `-s 0` with `--no-cache` or an empty cache falls back to full scan. `--no-network` ignores this flag. Does not detect edits to already-cached days (API has no mtime).
 - Unit-aware parsing: Parser uses cached user unit preference (`user_wants_kg`) to correctly interpret weights without explicit units when reading from cache or importing files, preventing 2.2x multiplier errors in offline mode
  - Table command for PR progression: Displays personal records over time with 1RM calculations (Brzycki formula), date/exercise filtering, age-based color gradient (256-color ANSI), projected weights for rep ranges 1-10, deterministic processing in chronological order, and deduplication of same-day same-rep PRs (keeps only the best weight per day per rep count)
  - Heatmap command: Displays calendar heatmap of workout intensity with mutually exclusive metric options (--sets, --reps, --volume, --weight, --onerm; default: onerm), date/exercise filtering, color scheme options (--green for RGB green gradient, defaulting to solarized table-style gradient), symbol gradients for no-color mode, adapted from clinvoice-rs heatmap implementation
@@ -176,6 +177,7 @@ Recent refactoring extracted common code into helper functions to improve mainta
   - `workouts::resolve_user_wants_kg`: Consolidates logic for determining user weight unit preference, checking network token then falling back to cache.
   - `workouts::get_dates_from_ranges`: Unified logic for parsing date ranges and fetching/calculating dates, used by both `list` and `fetch` commands.
   - `workouts::jrange_windows` / `fetch_jrange_windows`: Split a bounded date range into concurrent `jrange` week-windows (max 32 weeks each).
+  - `workouts::latest_cached_date` / `resolve_date_scan`: Newest cache filename and the `-s/--scan-days` policy (`DateScan::{Full,CacheOnly,Hybrid}`).
   - `workouts::format_cached_jday_text` / `read_cached_jday_text`: Cache file text used by `write_cached_jday` and `fetch --diff`.
   - `fetch::format_text_diff`: Unified-style diff; returns `None` when local and server texts are identical.
   - `utils::create_progress_bar`: Standardized progress bar creation using `indicatif`.
@@ -213,6 +215,6 @@ Unlike the C version which shows separate tables per filter, the Rust implementa
 - Support for other set types (WxD, WxT, etc.).
 - Support for tags, time/distance sets.
 - DELETE keyword handling in cache management.
-- Cache invalidation without a remote mtime: refetch recent dates always, or ask upstream for `updatedAt` on `JLog` / `JRangeDayData`.
+- Cache invalidation without a remote mtime: `-s/--scan-days` finds new dates but not edits to already-cached days; ask upstream for `updatedAt` on `JLog` / `JRangeDayData`.
 
 

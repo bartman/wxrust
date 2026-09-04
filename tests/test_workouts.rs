@@ -1,11 +1,20 @@
-use mockall::mock;
-use wxrust::workouts::{get_jday, get_dates, get_dates_from_cache, get_jdays, get_jdays_batch, get_jdays_with_callback, read_cached_user_wants_kg, read_cached_user_wants_kg_or, write_cached_user_wants_kg, forget_cached_user_wants_kg, cached_jday_exists, read_cached_jday_text, format_cached_jday_text, write_cached_jday, jday_alias, chunk_dates, build_jday_query, build_batch_jday_query, JDAY_BATCH_SIZE};
-use wxrust::models::{GraphQLResponse, WorkoutData, JDay, EBlock, ExerciseWrapper, Exercise, Set, User};
 use base64::{Engine, engine::general_purpose};
-use tempfile::TempDir;
+use chrono::{Duration, Utc};
 use lazy_static::lazy_static;
-use tokio::sync::Mutex;
+use mockall::mock;
 use std::fs;
+use tempfile::TempDir;
+use tokio::sync::Mutex;
+use wxrust::models::{
+    EBlock, Exercise, ExerciseWrapper, GraphQLResponse, JDay, Set, User, WorkoutData,
+};
+use wxrust::workouts::{
+    JDAY_BATCH_SIZE, build_batch_jday_query, build_jday_query, cached_jday_exists, chunk_dates,
+    forget_cached_user_wants_kg, format_cached_jday_text, get_dates, get_dates_from_cache,
+    get_jday, get_jdays, get_jdays_batch, get_jdays_with_callback, jday_alias, latest_cached_date,
+    read_cached_jday_text, read_cached_user_wants_kg, read_cached_user_wants_kg_or,
+    write_cached_jday, write_cached_user_wants_kg,
+};
 
 // all tests in this file run sequentially to avoid clashing with global cached state;
 // to do this we use an async-aware mutex and hold it in each test,
@@ -33,10 +42,14 @@ async fn test_get_jday_graphql_error() {
     // Set up test cache directory
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
 
-    let header = general_purpose::URL_SAFE_NO_PAD.encode(r#"{"alg":"HS256","typ":"JWT"}"#.as_bytes());
-    let payload = general_purpose::URL_SAFE_NO_PAD.encode(r#"{"id":123,"exp":2000000000}"#.as_bytes());
+    let header =
+        general_purpose::URL_SAFE_NO_PAD.encode(r#"{"alg":"HS256","typ":"JWT"}"#.as_bytes());
+    let payload =
+        general_purpose::URL_SAFE_NO_PAD.encode(r#"{"id":123,"exp":2000000000}"#.as_bytes());
     let token = format!("{}.{}.{}", header, payload, "signature");
 
     let mut mock_client = MockApiClient::new();
@@ -46,7 +59,9 @@ async fn test_get_jday_graphql_error() {
         .returning(|_, _, _| {
             Ok(GraphQLResponse {
                 data: None,
-                errors: Some(vec![wxrust::models::GraphQLError { message: "GraphQL error".to_string() }]),
+                errors: Some(vec![wxrust::models::GraphQLError {
+                    message: "GraphQL error".to_string(),
+                }]),
             })
         });
 
@@ -57,6 +72,7 @@ async fn test_get_jday_graphql_error() {
         use_network: true,
         use_cache: true,
         write_cache: true,
+        scan_days: 0,
     };
 
     let result = get_jday(&data_access, "2023-10-01", false).await;
@@ -65,9 +81,13 @@ async fn test_get_jday_graphql_error() {
 
     // Restore original XDG_CACHE_HOME
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -77,11 +97,15 @@ async fn test_get_jday_success() {
     // Set up test cache directory
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
 
     // Create a valid JWT token
-    let header = general_purpose::URL_SAFE_NO_PAD.encode(r#"{"alg":"HS256","typ":"JWT"}"#.as_bytes());
-    let payload = general_purpose::URL_SAFE_NO_PAD.encode(r#"{"id":123,"exp":2000000000}"#.as_bytes());
+    let header =
+        general_purpose::URL_SAFE_NO_PAD.encode(r#"{"alg":"HS256","typ":"JWT"}"#.as_bytes());
+    let payload =
+        general_purpose::URL_SAFE_NO_PAD.encode(r#"{"id":123,"exp":2000000000}"#.as_bytes());
     let token = format!("{}.{}.{}", header, payload, "signature");
 
     let mut mock_client = MockApiClient::new();
@@ -128,6 +152,7 @@ async fn test_get_jday_success() {
         use_network: true,
         use_cache: true,
         write_cache: true,
+        scan_days: 0,
     };
 
     let result = get_jday(&data_access, "2023-10-01", false).await;
@@ -138,9 +163,13 @@ async fn test_get_jday_success() {
 
     // Restore original XDG_CACHE_HOME
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -150,10 +179,14 @@ async fn test_get_jday_no_workout() {
     // Set up test cache directory
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
 
-    let header = general_purpose::URL_SAFE_NO_PAD.encode(r#"{"alg":"HS256","typ":"JWT"}"#.as_bytes());
-    let payload = general_purpose::URL_SAFE_NO_PAD.encode(r#"{"id":123,"exp":2000000000}"#.as_bytes());
+    let header =
+        general_purpose::URL_SAFE_NO_PAD.encode(r#"{"alg":"HS256","typ":"JWT"}"#.as_bytes());
+    let payload =
+        general_purpose::URL_SAFE_NO_PAD.encode(r#"{"id":123,"exp":2000000000}"#.as_bytes());
     let token = format!("{}.{}.{}", header, payload, "signature");
 
     let mut mock_client = MockApiClient::new();
@@ -178,6 +211,7 @@ async fn test_get_jday_no_workout() {
         use_network: true,
         use_cache: true,
         write_cache: true,
+        scan_days: 0,
     };
 
     let result = get_jday(&data_access, "2023-10-01", false).await;
@@ -186,9 +220,13 @@ async fn test_get_jday_no_workout() {
 
     // Restore original XDG_CACHE_HOME
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -198,7 +236,9 @@ async fn test_get_jday_invalid_token() {
     // Set up test cache directory
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
 
     let token = "invalid";
     let mut mock_client = MockApiClient::new();
@@ -206,9 +246,7 @@ async fn test_get_jday_invalid_token() {
     mock_client
         .expect_graphql_request::<wxrust::models::WorkoutData>()
         .times(1)
-        .returning(|_, _, _| {
-            Err("Authentication error".into())
-        });
+        .returning(|_, _, _| Err("Authentication error".into()));
 
     let data_access = wxrust::api::DataAccess {
         client: &mock_client,
@@ -217,15 +255,20 @@ async fn test_get_jday_invalid_token() {
         use_network: true,
         use_cache: true,
         write_cache: true,
+        scan_days: 0,
     };
     let result = get_jday(&data_access, "2023-10-01", false).await;
     assert!(result.is_err());
 
     // Restore original XDG_CACHE_HOME
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -235,10 +278,14 @@ async fn test_get_dates_success() {
     // Set up test cache directory
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
 
-    let header = general_purpose::URL_SAFE_NO_PAD.encode(r#"{"alg":"HS256","typ":"JWT"}"#.as_bytes());
-    let payload = general_purpose::URL_SAFE_NO_PAD.encode(r#"{"id":123,"exp":2000000000}"#.as_bytes());
+    let header =
+        general_purpose::URL_SAFE_NO_PAD.encode(r#"{"alg":"HS256","typ":"JWT"}"#.as_bytes());
+    let payload =
+        general_purpose::URL_SAFE_NO_PAD.encode(r#"{"id":123,"exp":2000000000}"#.as_bytes());
     let token = format!("{}.{}.{}", header, payload, "signature");
 
     let mut mock_client = MockApiClient::new();
@@ -265,6 +312,7 @@ async fn test_get_dates_success() {
         use_network: true,
         use_cache: true,
         write_cache: true,
+        scan_days: 0,
     };
 
     let result = get_dates(&data_access, None, None, 1, false).await;
@@ -274,9 +322,13 @@ async fn test_get_dates_success() {
 
     // Restore original XDG_CACHE_HOME
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -285,7 +337,9 @@ async fn test_get_dates_bounded_range() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
 
     let mut mock_client = MockApiClient::new();
     mock_client
@@ -311,6 +365,7 @@ async fn test_get_dates_bounded_range() {
         use_network: true,
         use_cache: true,
         write_cache: true,
+        scan_days: 0,
     };
 
     let result = get_dates(
@@ -319,14 +374,19 @@ async fn test_get_dates_bounded_range() {
         Some("2023-10-01".to_string()),
         1,
         false,
-    ).await;
+    )
+    .await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), vec!["2023-10-01".to_string()]);
 
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -336,7 +396,9 @@ async fn test_get_dates_invalid_token() {
     // Set up test cache directory
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
 
     let token = "invalid";
     let mut mock_client = MockApiClient::new();
@@ -344,9 +406,7 @@ async fn test_get_dates_invalid_token() {
     mock_client
         .expect_graphql_request::<wxrust::models::GetJRangeData>()
         .times(1)
-        .returning(|_, _, _| {
-            Err("Authentication error".into())
-        });
+        .returning(|_, _, _| Err("Authentication error".into()));
 
     let data_access = wxrust::api::DataAccess {
         client: &mock_client,
@@ -355,15 +415,20 @@ async fn test_get_dates_invalid_token() {
         use_network: true,
         use_cache: true,
         write_cache: true,
+        scan_days: 0,
     };
     let result = get_dates(&data_access, None, None, 1, false).await;
     assert!(result.is_err());
 
     // Restore original XDG_CACHE_HOME
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -372,7 +437,9 @@ async fn test_read_cached_user_wants_kg_none() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
 
     forget_cached_user_wants_kg();
 
@@ -381,9 +448,13 @@ async fn test_read_cached_user_wants_kg_none() {
 
     // Restore original XDG_CACHE_HOME
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -392,7 +463,9 @@ async fn test_read_cached_user_wants_kg_true() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
 
     forget_cached_user_wants_kg();
 
@@ -405,9 +478,13 @@ async fn test_read_cached_user_wants_kg_true() {
 
     // Restore original XDG_CACHE_HOME
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -416,7 +493,9 @@ async fn test_read_cached_user_wants_kg_false() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
 
     forget_cached_user_wants_kg();
 
@@ -429,9 +508,13 @@ async fn test_read_cached_user_wants_kg_false() {
 
     // Restore original XDG_CACHE_HOME
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -440,7 +523,9 @@ async fn test_read_cached_user_wants_kg_invalid() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
 
     forget_cached_user_wants_kg();
 
@@ -454,9 +539,13 @@ async fn test_read_cached_user_wants_kg_invalid() {
 
     // Restore original XDG_CACHE_HOME
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -465,7 +554,9 @@ async fn test_read_cached_user_wants_kg_or() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
 
     forget_cached_user_wants_kg();
 
@@ -482,9 +573,13 @@ async fn test_read_cached_user_wants_kg_or() {
 
     // Restore original XDG_CACHE_HOME
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -493,7 +588,9 @@ async fn test_write_cached_user_wants_kg() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
 
     forget_cached_user_wants_kg();
 
@@ -509,9 +606,13 @@ async fn test_write_cached_user_wants_kg() {
 
     // Restore original XDG_CACHE_HOME
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -520,7 +621,9 @@ async fn test_get_dates_from_cache_empty_dir() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
 
     // No cache directory exists
     let result = get_dates_from_cache(123, None, None, 10, false);
@@ -529,9 +632,13 @@ async fn test_get_dates_from_cache_empty_dir() {
 
     // Restore original XDG_CACHE_HOME
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -540,7 +647,9 @@ async fn test_get_dates_from_cache_with_files() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
 
     // Create cache directory and files
     let cache_dir = temp_dir.path().join("wxrust").join("456");
@@ -558,9 +667,13 @@ async fn test_get_dates_from_cache_with_files() {
 
     // Restore original XDG_CACHE_HOME
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -569,7 +682,9 @@ async fn test_get_dates_from_cache_with_filters() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
 
     // Create cache directory and files
     let cache_dir = temp_dir.path().join("wxrust").join("789");
@@ -593,16 +708,26 @@ async fn test_get_dates_from_cache_with_filters() {
     assert_eq!(dates, vec!["2025-01-01", "2025-01-05", "2025-01-10"]);
 
     // Test with both filters
-    let result = get_dates_from_cache(789, Some("2025-01-15".to_string()), Some("2025-01-05".to_string()), 0, false);
+    let result = get_dates_from_cache(
+        789,
+        Some("2025-01-15".to_string()),
+        Some("2025-01-05".to_string()),
+        0,
+        false,
+    );
     assert!(result.is_ok());
     let dates = result.unwrap();
     assert_eq!(dates, vec!["2025-01-05", "2025-01-10", "2025-01-15"]);
 
     // Restore original XDG_CACHE_HOME
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -611,7 +736,9 @@ async fn test_get_dates_from_cache_with_count() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
 
     // Create cache directory and files
     let cache_dir = temp_dir.path().join("wxrust").join("999");
@@ -630,9 +757,13 @@ async fn test_get_dates_from_cache_with_count() {
 
     // Restore original XDG_CACHE_HOME
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -641,7 +772,9 @@ async fn test_get_dates_from_cache_with_reverse() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
 
     // Create cache directory and files
     let cache_dir = temp_dir.path().join("wxrust").join("111");
@@ -658,9 +791,13 @@ async fn test_get_dates_from_cache_with_reverse() {
 
     // Restore original XDG_CACHE_HOME
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -681,6 +818,7 @@ async fn test_resolve_user_wants_kg_with_token() {
         use_network: true,
         use_cache: true,
         write_cache: true,
+        scan_days: 0,
     };
 
     let result = wxrust::workouts::resolve_user_wants_kg(&data_access).await;
@@ -692,10 +830,12 @@ async fn test_resolve_user_wants_kg_without_token() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
 
     forget_cached_user_wants_kg();
-    
+
     // Set cache to false
     let wxrust_dir = temp_dir.path().join("wxrust");
     std::fs::create_dir_all(&wxrust_dir).unwrap();
@@ -711,6 +851,7 @@ async fn test_resolve_user_wants_kg_without_token() {
         use_network: false,
         use_cache: true,
         write_cache: false,
+        scan_days: 0,
     };
 
     let result = wxrust::workouts::resolve_user_wants_kg(&data_access).await;
@@ -718,9 +859,13 @@ async fn test_resolve_user_wants_kg_without_token() {
 
     // Restore original XDG_CACHE_HOME
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -729,7 +874,9 @@ async fn test_get_dates_from_ranges() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
 
     // Setup cache
     let cache_dir = temp_dir.path().join("wxrust").join("123");
@@ -748,9 +895,13 @@ async fn test_get_dates_from_ranges() {
         use_network: false, // Force cache usage
         use_cache: true,
         write_cache: false,
+        scan_days: 0,
     };
 
-    let ranges = vec!["2023-10-01..2023-10-02".to_string(), "2023-10-05".to_string()];
+    let ranges = vec![
+        "2023-10-01..2023-10-02".to_string(),
+        "2023-10-05".to_string(),
+    ];
     let result = wxrust::workouts::get_dates_from_ranges(&data_access, &ranges).await;
 
     assert!(result.is_ok());
@@ -759,9 +910,13 @@ async fn test_get_dates_from_ranges() {
 
     // Restore original XDG_CACHE_HOME
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -836,7 +991,9 @@ async fn test_cached_jday_exists() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
 
     forget_cached_user_wants_kg();
 
@@ -850,9 +1007,13 @@ async fn test_cached_jday_exists() {
     assert!(!cached_jday_exists(123, "2023-10-02"));
 
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -861,7 +1022,9 @@ async fn test_read_and_format_cached_jday_text() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
     forget_cached_user_wants_kg();
 
     assert!(read_cached_jday_text(123, "2023-10-01").is_none());
@@ -894,9 +1057,13 @@ async fn test_read_and_format_cached_jday_text() {
     assert!(written.ends_with('\n'));
 
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -911,6 +1078,7 @@ async fn test_get_jdays_empty() {
         use_network: true,
         use_cache: true,
         write_cache: false,
+        scan_days: 0,
     };
     let result = get_jdays(&data_access, &[], false).await;
     assert!(result.is_ok());
@@ -928,6 +1096,7 @@ async fn test_get_jdays_batch_empty() {
         use_network: true,
         use_cache: true,
         write_cache: false,
+        scan_days: 0,
     };
     let result = get_jdays_batch(&data_access, &[], false).await;
     assert!(result.is_ok());
@@ -939,7 +1108,9 @@ async fn test_get_jdays_batch_success() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
     forget_cached_user_wants_kg();
 
     let mut mock_client = MockApiClient::new();
@@ -963,6 +1134,7 @@ async fn test_get_jdays_batch_success() {
         use_network: true,
         use_cache: false,
         write_cache: false,
+        scan_days: 0,
     };
 
     let dates = vec!["2023-10-01".to_string(), "2023-10-02".to_string()];
@@ -976,9 +1148,13 @@ async fn test_get_jdays_batch_success() {
     assert_eq!(workouts[1].1.log, "log-b");
 
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -1005,12 +1181,17 @@ async fn test_get_jdays_batch_missing_workout() {
         use_network: true,
         use_cache: false,
         write_cache: false,
+        scan_days: 0,
     };
 
     let dates = vec!["2023-10-01".to_string()];
     let result = get_jdays_batch(&data_access, &dates, false).await;
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("No workout found for 2023-10-01"));
+    assert!(
+        result
+            .unwrap_err()
+            .contains("No workout found for 2023-10-01")
+    );
 }
 
 #[tokio::test]
@@ -1023,7 +1204,9 @@ async fn test_get_jdays_batch_graphql_error() {
         .returning(|_, _, _| {
             Ok(GraphQLResponse {
                 data: None,
-                errors: Some(vec![wxrust::models::GraphQLError { message: "boom".to_string() }]),
+                errors: Some(vec![wxrust::models::GraphQLError {
+                    message: "boom".to_string(),
+                }]),
             })
         });
 
@@ -1034,6 +1217,7 @@ async fn test_get_jdays_batch_graphql_error() {
         use_network: true,
         use_cache: false,
         write_cache: false,
+        scan_days: 0,
     };
 
     let dates = vec!["2023-10-01".to_string()];
@@ -1047,7 +1231,9 @@ async fn test_get_jdays_with_callback_chunks() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
     forget_cached_user_wants_kg();
 
     let mut mock_client = MockApiClient::new();
@@ -1078,6 +1264,7 @@ async fn test_get_jdays_with_callback_chunks() {
         use_network: true,
         use_cache: false,
         write_cache: false,
+        scan_days: 0,
     };
 
     let dates = vec![
@@ -1086,14 +1273,10 @@ async fn test_get_jdays_with_callback_chunks() {
         "2023-10-03".to_string(),
     ];
     let mut seen = Vec::new();
-    let result = get_jdays_with_callback(
-        &data_access,
-        &dates,
-        1,
-        2,
-        false,
-        |date, _jday| seen.push(date.to_string()),
-    ).await;
+    let result = get_jdays_with_callback(&data_access, &dates, 1, 2, false, |date, _jday| {
+        seen.push(date.to_string())
+    })
+    .await;
 
     assert!(result.is_ok());
     let workouts = result.unwrap();
@@ -1108,9 +1291,13 @@ async fn test_get_jdays_with_callback_chunks() {
     assert_eq!(seen.len(), 3);
 
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -1119,7 +1306,9 @@ async fn test_get_jdays_batch_uses_cache() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
     forget_cached_user_wants_kg();
 
     let cache_dir = temp_dir.path().join("wxrust").join("123");
@@ -1127,7 +1316,8 @@ async fn test_get_jdays_batch_uses_cache() {
     fs::write(
         cache_dir.join("2023-10-01.txt"),
         "2023-10-01\n@ 80 kg bw\n#Squat\n135 x 5\n",
-    ).unwrap();
+    )
+    .unwrap();
 
     // No network calls expected — served from cache
     let mock_client = MockApiClient::new();
@@ -1138,6 +1328,7 @@ async fn test_get_jdays_batch_uses_cache() {
         use_network: true,
         use_cache: true,
         write_cache: false,
+        scan_days: 0,
     };
 
     let dates = vec!["2023-10-01".to_string()];
@@ -1149,8 +1340,292 @@ async fn test_get_jdays_batch_uses_cache() {
     assert_eq!(workouts[0].1.exercises[0].exercise.name, "Squat");
 
     if let Ok(original) = original_xdg_cache {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
+}
+
+fn restore_xdg_cache(original: Result<String, std::env::VarError>) {
+    if let Ok(original) = original {
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
+    } else {
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
+    }
+}
+
+fn ymd_string(date: chrono::NaiveDate) -> String {
+    date.format("%Y-%m-%d").to_string()
+}
+
+fn jrange_on(date: String) -> wxrust::models::JRangeDayData {
+    wxrust::models::JRangeDayData { on: Some(date) }
+}
+
+#[tokio::test]
+async fn test_latest_cached_date() {
+    let _guard = ENV_MUTEX.lock().await;
+    let temp_dir = TempDir::new().unwrap();
+    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
+
+    assert_eq!(latest_cached_date(123), None);
+
+    let cache_dir = temp_dir.path().join("wxrust").join("123");
+    fs::create_dir_all(&cache_dir).unwrap();
+    fs::write(cache_dir.join("2025-01-01.txt"), "a").unwrap();
+    fs::write(cache_dir.join("2025-03-15.txt"), "b").unwrap();
+    fs::write(cache_dir.join("2024-12-31.txt"), "c").unwrap();
+
+    assert_eq!(
+        latest_cached_date(123),
+        chrono::NaiveDate::from_ymd_opt(2025, 3, 15)
+    );
+
+    restore_xdg_cache(original_xdg_cache);
+}
+
+#[tokio::test]
+async fn test_get_dates_scan_zero_skips_network_when_current() {
+    let _guard = ENV_MUTEX.lock().await;
+    let temp_dir = TempDir::new().unwrap();
+    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
+
+    let today = Utc::now().date_naive();
+    let old = today - Duration::days(40);
+    let cache_dir = temp_dir.path().join("wxrust").join("123");
+    fs::create_dir_all(&cache_dir).unwrap();
+    fs::write(cache_dir.join(format!("{}.txt", ymd_string(old))), "old").unwrap();
+    fs::write(
+        cache_dir.join(format!("{}.txt", ymd_string(today))),
+        "today",
+    )
+    .unwrap();
+
+    let mock_client = MockApiClient::new();
+    let data_access = wxrust::api::DataAccess {
+        client: &mock_client,
+        token: Some("token"),
+        uid: Some(123),
+        use_network: true,
+        use_cache: true,
+        write_cache: false,
+        scan_days: 0,
+    };
+
+    let result = get_dates(&data_access, None, None, 10000, false)
+        .await
+        .unwrap();
+    assert_eq!(result, vec![ymd_string(old), ymd_string(today)]);
+
+    restore_xdg_cache(original_xdg_cache);
+}
+
+#[tokio::test]
+async fn test_get_dates_scan_zero_merges_since_last_cached() {
+    let _guard = ENV_MUTEX.lock().await;
+    let temp_dir = TempDir::new().unwrap();
+    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
+
+    let today = Utc::now().date_naive();
+    let yesterday = today - Duration::days(1);
+    let old = today - Duration::days(40);
+    let cache_dir = temp_dir.path().join("wxrust").join("123");
+    fs::create_dir_all(&cache_dir).unwrap();
+    fs::write(cache_dir.join(format!("{}.txt", ymd_string(old))), "old").unwrap();
+    fs::write(
+        cache_dir.join(format!("{}.txt", ymd_string(yesterday))),
+        "y",
+    )
+    .unwrap();
+
+    let today_s = ymd_string(today);
+    let mut mock_client = MockApiClient::new();
+    mock_client
+        .expect_graphql_request::<wxrust::models::GetJRangeData>()
+        .times(1)
+        .returning(move |_, _, _| {
+            Ok(GraphQLResponse {
+                data: Some(wxrust::models::GetJRangeData {
+                    jrange: Some(wxrust::models::JRangeData {
+                        days: Some(vec![jrange_on(today_s.clone())]),
+                    }),
+                }),
+                errors: None,
+            })
+        });
+
+    let data_access = wxrust::api::DataAccess {
+        client: &mock_client,
+        token: Some("token"),
+        uid: Some(123),
+        use_network: true,
+        use_cache: true,
+        write_cache: false,
+        scan_days: 0,
+    };
+
+    let result = get_dates(&data_access, None, None, 10000, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        result,
+        vec![ymd_string(old), ymd_string(yesterday), ymd_string(today)]
+    );
+
+    restore_xdg_cache(original_xdg_cache);
+}
+
+#[tokio::test]
+async fn test_get_dates_scan_seven_merges_cache() {
+    let _guard = ENV_MUTEX.lock().await;
+    let temp_dir = TempDir::new().unwrap();
+    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
+
+    let today = Utc::now().date_naive();
+    let old = chrono::NaiveDate::from_ymd_opt(2023, 1, 1).unwrap();
+    let cache_dir = temp_dir.path().join("wxrust").join("123");
+    fs::create_dir_all(&cache_dir).unwrap();
+    fs::write(cache_dir.join(format!("{}.txt", ymd_string(old))), "old").unwrap();
+    fs::write(
+        cache_dir.join(format!("{}.txt", ymd_string(today))),
+        "today",
+    )
+    .unwrap();
+
+    let today_s = ymd_string(today);
+    let mut mock_client = MockApiClient::new();
+    mock_client
+        .expect_graphql_request::<wxrust::models::GetJRangeData>()
+        .times(1)
+        .returning(move |_, _, _| {
+            Ok(GraphQLResponse {
+                data: Some(wxrust::models::GetJRangeData {
+                    jrange: Some(wxrust::models::JRangeData {
+                        days: Some(vec![jrange_on(today_s.clone())]),
+                    }),
+                }),
+                errors: None,
+            })
+        });
+
+    let data_access = wxrust::api::DataAccess {
+        client: &mock_client,
+        token: Some("token"),
+        uid: Some(123),
+        use_network: true,
+        use_cache: true,
+        write_cache: false,
+        scan_days: 7,
+    };
+
+    let result = get_dates(&data_access, None, None, 10000, false)
+        .await
+        .unwrap();
+    assert_eq!(result, vec![ymd_string(old), ymd_string(today)]);
+
+    restore_xdg_cache(original_xdg_cache);
+}
+
+#[tokio::test]
+async fn test_get_dates_scan_zero_no_cache_is_full() {
+    let _guard = ENV_MUTEX.lock().await;
+    let temp_dir = TempDir::new().unwrap();
+    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
+
+    let mut mock_client = MockApiClient::new();
+    mock_client
+        .expect_graphql_request::<wxrust::models::GetJRangeData>()
+        .times(1)
+        .returning(|_, _, _| {
+            Ok(GraphQLResponse {
+                data: Some(wxrust::models::GetJRangeData {
+                    jrange: Some(wxrust::models::JRangeData {
+                        days: Some(vec![jrange_on("2023-10-01".to_string())]),
+                    }),
+                }),
+                errors: None,
+            })
+        });
+
+    let data_access = wxrust::api::DataAccess {
+        client: &mock_client,
+        token: Some("token"),
+        uid: Some(123),
+        use_network: true,
+        use_cache: false,
+        write_cache: false,
+        scan_days: 0,
+    };
+
+    let result = get_dates(&data_access, None, None, 1, false).await.unwrap();
+    assert_eq!(result, vec!["2023-10-01".to_string()]);
+
+    restore_xdg_cache(original_xdg_cache);
+}
+
+#[tokio::test]
+async fn test_get_dates_scan_zero_historical_range_is_cache_only() {
+    let _guard = ENV_MUTEX.lock().await;
+    let temp_dir = TempDir::new().unwrap();
+    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
+
+    let today = Utc::now().date_naive();
+    let cache_dir = temp_dir.path().join("wxrust").join("123");
+    fs::create_dir_all(&cache_dir).unwrap();
+    fs::write(cache_dir.join("2020-06-01.txt"), "old").unwrap();
+    fs::write(
+        cache_dir.join(format!("{}.txt", ymd_string(today))),
+        "today",
+    )
+    .unwrap();
+
+    let mock_client = MockApiClient::new();
+    let data_access = wxrust::api::DataAccess {
+        client: &mock_client,
+        token: Some("token"),
+        uid: Some(123),
+        use_network: true,
+        use_cache: true,
+        write_cache: false,
+        scan_days: 0,
+    };
+
+    let result = get_dates(
+        &data_access,
+        Some("2020-12-31".to_string()),
+        Some("2020-01-01".to_string()),
+        10000,
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(result, vec!["2020-06-01".to_string()]);
+
+    restore_xdg_cache(original_xdg_cache);
 }

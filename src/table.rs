@@ -1,16 +1,16 @@
 use std::collections::HashMap;
 use std::ops::Index;
 
-use chrono::{NaiveDate, Utc, Datelike};
-use lazy_static::lazy_static;
 use ansi_term::Colour;
+use chrono::{Datelike, NaiveDate, Utc};
+use lazy_static::lazy_static;
 
 use crate::api::{ApiClient, DataAccess};
-use crate::models::{JDay, EBlock, Exercise, ExerciseWrapper};
-use crate::workouts;
-use crate::utils;
 use crate::formatters::STDERR_COLOR_ENABLED;
+use crate::models::{EBlock, Exercise, ExerciseWrapper, JDay};
 use crate::parsers::{LBS_PER_KG, ParserOptions, parse_set_line_with_options};
+use crate::utils;
+use crate::workouts;
 
 /// Maximum reps to track for rep-specific PRs
 const MAX_REPS: usize = 10;
@@ -20,8 +20,7 @@ const ONERM_FACTOR: f32 = 36.0;
 /// Color gradient for age-based coloring (256-color ANSI codes)
 /// From oldest (cool colors) to newest (warm colors)
 pub const GRADIENT: [u8; 20] = [
-    0x23, 0x24, 0x25, 0x20, 0x21, 0x3f, 0x39, 0x5d,
-    0x81, 0xa5, 0xc9, 0xc8, 0xc7, 0xc6, 0xc5, 0xc4,
+    0x23, 0x24, 0x25, 0x20, 0x21, 0x3f, 0x39, 0x5d, 0x81, 0xa5, 0xc9, 0xc8, 0xc7, 0xc6, 0xc5, 0xc4,
     0xca, 0xd0, 0xd6, 0xdc,
 ];
 
@@ -170,37 +169,42 @@ impl TableState {
         }
 
         let ent_1rm = calculate_1rm(weight, reps);
-        let r = if reps > MAX_REPS as u32 { MAX_REPS } else { reps as usize };
+        let r = if reps > MAX_REPS as u32 {
+            MAX_REPS
+        } else {
+            reps as usize
+        };
 
         // Check if this is a new PR for this rep range
         let is_new_rep_pr = r <= MAX_REPS && self.best_1rm_for_reps[r] < ent_1rm;
-        if ! is_new_rep_pr && !is_dream { return; };
+        if !is_new_rep_pr && !is_dream {
+            return;
+        };
 
         // Check if this PR replaces an existing PR on the same day
         let old_index = self.best_1rm_index[r];
-        let mut replacing_old_index =
-        if old_index >= 0 {
+        let mut replacing_old_index = if old_index >= 0 {
             let old_index = old_index as usize;
             let old_record = self.records.index(old_index);
 
             old_record.date == date
-        } else { false };
+        } else {
+            false
+        };
 
         if replacing_old_index {
             let old_index = old_index as usize;
 
             if self.records[old_index].best_reps == reps {
-
                 self.records[old_index].date = date.to_string();
                 self.records[old_index].best_weight = weight;
                 self.records[old_index].best_1rm = ent_1rm;
-
             } else {
                 replacing_old_index = false;
             }
         }
 
-        if ! replacing_old_index {
+        if !replacing_old_index {
             let record = Record {
                 date: date.to_string(),
                 exercise_name: exercise_name.to_string(),
@@ -239,7 +243,9 @@ pub fn matches_any_filter(exercise_name: &str, filters: &[String]) -> bool {
         return true; // No filters = match all
     }
     let name_lower = exercise_name.to_lowercase();
-    filters.iter().any(|f| name_lower.contains(&f.to_lowercase()))
+    filters
+        .iter()
+        .any(|f| name_lower.contains(&f.to_lowercase()))
 }
 
 // ============================================================================
@@ -305,11 +311,7 @@ fn bg_256(color: u8) -> String {
 
 /// Reset color escape sequence
 fn col_reset() -> &'static str {
-    if *COLOR_ENABLED {
-        "\x1b[0m"
-    } else {
-        ""
-    }
+    if *COLOR_ENABLED { "\x1b[0m" } else { "" }
 }
 
 /// Calculate color index based on days since start and total days
@@ -342,7 +344,11 @@ pub fn format_table(state: &TableState, filters: &[String], user_wants_kg: bool)
 
     // Sort records by 1RM (ascending, like C code)
     let mut sorted_records = state.records.clone();
-    sorted_records.sort_by(|a, b| a.best_1rm.partial_cmp(&b.best_1rm).unwrap_or(std::cmp::Ordering::Equal));
+    sorted_records.sort_by(|a, b| {
+        a.best_1rm
+            .partial_cmp(&b.best_1rm)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     // Calculate date range
     let dates: Vec<&str> = sorted_records.iter().map(|r| r.date.as_str()).collect();
@@ -364,8 +370,12 @@ pub fn format_table(state: &TableState, filters: &[String], user_wants_kg: bool)
     } else {
         filters.join(", ")
     };
-    output.push_str(&format!("There were {} records of {}, over {} days\n",
-        sorted_records.len(), filter_str, total_days));
+    output.push_str(&format!(
+        "There were {} records of {}, over {} days\n",
+        sorted_records.len(),
+        filter_str,
+        total_days
+    ));
 
     // Track best weight lifted for each rep range
     let mut best_lifted: [f32; MAX_REPS + 1] = [0.0; MAX_REPS + 1];
@@ -385,17 +395,25 @@ pub fn format_table(state: &TableState, filters: &[String], user_wants_kg: bool)
         };
 
         let col = get_gradient_color(days_since_start, total_days, days_ago);
-        let colbg  = if record.is_dream { bg_256(DREAM_BG) } else { bg_256(0) };
+        let colbg = if record.is_dream {
+            bg_256(DREAM_BG)
+        } else {
+            bg_256(0)
+        };
         let coltxt = format!("{}{}", colbg, fg_256(col));
         let coldim = format!("{}{}", colbg, fg_256(BRIGHT_BLACK));
-        let reset  = format!("{}{}", colbg, fg_256(15));
+        let reset = format!("{}{}", colbg, fg_256(15));
 
         // Convert weights for display
         let display_weight = convert_weight_for_display(record.best_weight, user_wants_kg);
         let display_1rm = convert_weight_for_display(record.best_1rm, user_wants_kg);
 
         // Track best weight for this rep range (in display units)
-        let r = if record.best_reps > MAX_REPS as u32 { MAX_REPS } else { record.best_reps as usize };
+        let r = if record.best_reps > MAX_REPS as u32 {
+            MAX_REPS
+        } else {
+            record.best_reps as usize
+        };
         if r <= MAX_REPS && best_lifted[r] < display_weight {
             best_lifted[r] = display_weight;
             best_col[r] = col;
@@ -403,8 +421,10 @@ pub fn format_table(state: &TableState, filters: &[String], user_wants_kg: bool)
 
         // Format margin for high-rep sets (> MAX_REPS)
         let margin = if record.best_reps > MAX_REPS as u32 {
-            format!(" {}{:.0}{} x {}",
-                coltxt, display_weight, reset, record.best_reps)
+            format!(
+                " {}{:.0}{} x {}",
+                coltxt, display_weight, reset, record.best_reps
+            )
         } else {
             String::new()
         };
@@ -419,12 +439,19 @@ pub fn format_table(state: &TableState, filters: &[String], user_wants_kg: bool)
         };
 
         // Main row
-        output.push_str(&format!("{}{}{} | {}{:4}{} | {} | {:<lift_width$} | {}{:5.1}{} |",
-            coltxt, record.date, reset,
-            coltxt, days_ago, reset,
+        output.push_str(&format!(
+            "{}{}{} | {}{:4}{} | {} | {:<lift_width$} | {}{:5.1}{} |",
+            coltxt,
+            record.date,
+            reset,
+            coltxt,
+            days_ago,
+            reset,
             bw_str,
             record.exercise_name,
-            coltxt, display_1rm, reset,
+            coltxt,
+            display_1rm,
+            reset,
             lift_width = lift_width,
         ));
 
@@ -447,9 +474,15 @@ pub fn format_table(state: &TableState, filters: &[String], user_wants_kg: bool)
     }
 
     // Header row (printed at bottom like C code)
-    output.push_str(&format!("{}{}{:<10} | {:>4} | {:>5} | {:<lift_width$} | {:>5} |",
-        bg_256(17), fg_256(226),
-        "date", "days", "BW", "lift", "1RM",
+    output.push_str(&format!(
+        "{}{}{:<10} | {:>4} | {:>5} | {:<lift_width$} | {:>5} |",
+        bg_256(17),
+        fg_256(226),
+        "date",
+        "days",
+        "BW",
+        "lift",
+        "1RM",
         lift_width = lift_width,
     ));
     for rep in 1..=MAX_REPS {
@@ -458,25 +491,30 @@ pub fn format_table(state: &TableState, filters: &[String], user_wants_kg: bool)
     output.push_str(&format!("{}\n", col_reset()));
 
     // Best weight lifted row
-    output.push_str(&format!("{:>width$} |",
+    output.push_str(&format!(
+        "{:>width$} |",
         "best weight lifted",
         width = 36 + lift_width,
     ));
     for rep in 1..=MAX_REPS {
         let mut best = true;
-        for after in rep+1..MAX_REPS {
+        for after in rep + 1..MAX_REPS {
             if best_lifted[rep] <= best_lifted[after] {
                 best = false;
                 break;
             }
         }
-        let colrep = if best { fg_256(best_col[rep]) } else { fg_256(BRIGHT_BLACK) };
+        let colrep = if best {
+            fg_256(best_col[rep])
+        } else {
+            fg_256(BRIGHT_BLACK)
+        };
         let reset = col_reset();
         let str = if best_lifted[rep] > 0.0 {
-                &format!(" {}{:3.0}{} |", colrep, best_lifted[rep], reset)
-            } else {
-                "     |"
-            };
+            &format!(" {}{:3.0}{} |", colrep, best_lifted[rep], reset)
+        } else {
+            "     |"
+        };
         output.push_str(str);
     }
     output.push('\n');
@@ -515,10 +553,8 @@ pub async fn handle_table<C: ApiClient>(
             workouts::get_dates_from_ranges(&data_access, &date_args).await
         }
     };
-    let (dates_result, user_wants_kg) = tokio::join!(
-        dates_fut,
-        workouts::resolve_user_wants_kg(&data_access),
-    );
+    let (dates_result, user_wants_kg) =
+        tokio::join!(dates_fut, workouts::resolve_user_wants_kg(&data_access),);
 
     let dates = match dates_result {
         Ok(d) => d,
@@ -556,7 +592,12 @@ pub async fn handle_table<C: ApiClient>(
     for dream in dreams {
         // Use today's date
         let today = Utc::now().date_naive();
-        let date = format!("{:04}-{:02}-{:02}", today.year(), today.month(), today.day());
+        let date = format!(
+            "{:04}-{:02}-{:02}",
+            today.year(),
+            today.month(),
+            today.day()
+        );
 
         if verbose {
             let msg = format!("Dream set: {}", dream);
@@ -580,7 +621,10 @@ pub async fn handle_table<C: ApiClient>(
         };
 
         // Use first filter as the exercise name, or "Dream" if no filters
-        let exercise_name = filters.first().cloned().unwrap_or_else(|| "Dream".to_string());
+        let exercise_name = filters
+            .first()
+            .cloned()
+            .unwrap_or_else(|| "Dream".to_string());
         let exercise_id = exercise_name.clone();
 
         let jday = JDay {
@@ -617,4 +661,3 @@ pub async fn handle_table<C: ApiClient>(
     let output = format_table(&state, &filters, user_wants_kg);
     print!("{}", output);
 }
-

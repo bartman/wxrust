@@ -1,6 +1,6 @@
-use crate::models::{JDay, EBlock, ExerciseWrapper, Exercise, Set};
-use regex::Regex;
+use crate::models::{EBlock, Exercise, ExerciseWrapper, JDay, Set};
 use lazy_static::lazy_static;
+use regex::Regex;
 
 pub const LBS_PER_KG: f32 = 2.20462;
 
@@ -21,11 +21,17 @@ impl ParserOptions {
     }
 
     pub fn default() -> Self {
-        Self { user_wants_kg: true }
+        Self {
+            user_wants_kg: true,
+        }
     }
 }
 
-pub fn parse_bw_line(lines: &[&str], i: &mut usize, options: &ParserOptions) -> Result<Option<f32>, String> {
+pub fn parse_bw_line(
+    lines: &[&str],
+    i: &mut usize,
+    options: &ParserOptions,
+) -> Result<Option<f32>, String> {
     // Skip empty lines
     while *i < lines.len() && lines[*i].trim().is_empty() {
         *i += 1;
@@ -38,11 +44,13 @@ pub fn parse_bw_line(lines: &[&str], i: &mut usize, options: &ParserOptions) -> 
         let convert_to_kg = match caps.get(2) {
             Some(unit_match) if unit_match.as_str() == "lbs" => true,
             Some(unit_match) if unit_match.as_str() == "kg" => false,
-            None if !options.user_wants_kg => true,  // no units and user wants lbs, assume lbs and convert to kg
-            _ => false,  // no units and user wants kg, assume kg
+            None if !options.user_wants_kg => true, // no units and user wants lbs, assume lbs and convert to kg
+            _ => false,                             // no units and user wants kg, assume kg
         };
         if let Some(num_match) = caps.get(1) {
-            let bw_val: f32 = num_match.as_str().parse().map_err(|_| format!("Line {}: Invalid bw number: {}", *i + 1, num_match.as_str()))?;
+            let bw_val: f32 = num_match.as_str().parse().map_err(|_| {
+                format!("Line {}: Invalid bw number: {}", *i + 1, num_match.as_str())
+            })?;
             let bw = if convert_to_kg {
                 Some(bw_val / LBS_PER_KG)
             } else {
@@ -111,7 +119,7 @@ pub fn parse_workout_with_options(text: &str, options: &ParserOptions) -> Result
                     id: eid.clone(),
                     name: name.clone(),
                     ex_type: None,
-                }
+                },
             });
 
             log_lines.push(format!("EBLOCK:{}", eid));
@@ -120,7 +128,11 @@ pub fn parse_workout_with_options(text: &str, options: &ParserOptions) -> Result
             i += 1;
             let mut sets = Vec::new();
             let mut failed_lines = Vec::new();
-            while i < lines.len() && !lines[i].starts_with('#') && !lines[i].starts_with("//") && !lines[i].trim().is_empty() {
+            while i < lines.len()
+                && !lines[i].starts_with('#')
+                && !lines[i].starts_with("//")
+                && !lines[i].trim().is_empty()
+            {
                 let line = lines[i];
                 let set_line = line.trim();
                 match parse_set_line_with_options(set_line, options) {
@@ -145,10 +157,7 @@ pub fn parse_workout_with_options(text: &str, options: &ParserOptions) -> Result
             } else {
                 // Valid sets found, add failed lines to log
                 log_lines.extend(failed_lines);
-                eblocks.push(EBlock {
-                    eid,
-                    sets,
-                });
+                eblocks.push(EBlock { eid, sets });
             }
         } else {
             log_lines.push(line.to_string());
@@ -181,7 +190,12 @@ pub fn parse_workout_with_options(text: &str, options: &ParserOptions) -> Result
 //   405, 406 x 2 cccc - ( Set { w=405, r=2, s=1, c="" }, Set { w=406, r=2, s=1, c="cccc" } )
 
 pub fn is_weight_part(s: &str) -> bool {
-    s.chars().all(|c| c.is_ascii_digit() || c == ',' || c == '.' || c == '+' || c == '-') || s.to_lowercase().starts_with("bw") || s.to_lowercase().contains("kg") || s.to_lowercase().contains("lb") || s.to_lowercase().contains("lbs")
+    s.chars()
+        .all(|c| c.is_ascii_digit() || c == ',' || c == '.' || c == '+' || c == '-')
+        || s.to_lowercase().starts_with("bw")
+        || s.to_lowercase().contains("kg")
+        || s.to_lowercase().contains("lb")
+        || s.to_lowercase().contains("lbs")
 }
 
 pub fn parse_weight(s: &str) -> Result<(f32, bool, i32), String> {
@@ -210,8 +224,16 @@ pub fn parse_weight(s: &str) -> Result<(f32, bool, i32), String> {
     } else {
         let mut lb = false;
         let num_end = s.find(|c: char| !c.is_ascii_digit() && c != '.');
-        let num_str = if let Some(end) = num_end { &s[..end] } else { s };
-        let unit = if let Some(end) = num_end { &s[end..].trim().to_lowercase() } else { "" };
+        let num_str = if let Some(end) = num_end {
+            &s[..end]
+        } else {
+            s
+        };
+        let unit = if let Some(end) = num_end {
+            &s[end..].trim().to_lowercase()
+        } else {
+            ""
+        };
         if unit == "lb" || unit == "lbs" {
             lb = true;
         } else if unit == "kg" {
@@ -219,15 +241,15 @@ pub fn parse_weight(s: &str) -> Result<(f32, bool, i32), String> {
         } else if !unit.is_empty() {
             return Err(format!("Invalid unit: {}", unit));
         }
-        let v: f32 = num_str.parse().map_err(|_| format!("Invalid weight: {}", num_str))?;
+        let v: f32 = num_str
+            .parse()
+            .map_err(|_| format!("Invalid weight: {}", num_str))?;
         Ok((v, lb, 0))
     }
 }
 
 pub fn parse_weights(s: &str) -> Result<Vec<(f32, bool, i32)>, String> {
-    s.split(',')
-        .map(|p| parse_weight(p.trim()))
-        .collect()
+    s.split(',').map(|p| parse_weight(p.trim())).collect()
 }
 
 pub fn parse_reps_and_comment(s: &str) -> Result<(Vec<u32>, Option<String>), String> {
@@ -253,7 +275,9 @@ pub fn parse_reps_and_comment(s: &str) -> Result<(Vec<u32>, Option<String>), Str
             break;
         }
         let num_str: String = chars[start..i].iter().collect();
-        let num: u32 = num_str.parse().map_err(|_| format!("Invalid rep: {}", num_str))?;
+        let num: u32 = num_str
+            .parse()
+            .map_err(|_| format!("Invalid rep: {}", num_str))?;
         reps.push(num);
         // Skip whitespace
         while i < chars.len() && chars[i].is_whitespace() {
@@ -303,7 +327,10 @@ pub fn parse_set_line(line: &str) -> Result<Vec<Set>, String> {
     parse_set_line_with_options(line, &ParserOptions::default())
 }
 
-pub fn parse_set_line_with_options(line: &str, options: &ParserOptions) -> Result<Vec<Set>, String> {
+pub fn parse_set_line_with_options(
+    line: &str,
+    options: &ParserOptions,
+) -> Result<Vec<Set>, String> {
     let line = line.trim();
     let parts: Vec<&str> = line.split_whitespace().collect();
     if parts.is_empty() {
@@ -359,18 +386,23 @@ pub fn parse_set_line_with_options(line: &str, options: &ParserOptions) -> Resul
     let mut rpe = None;
     let mut final_comment = comment.clone();
     if let Some(c) = &comment
-        && c.trim().starts_with('@') {
-            let trimmed = c.trim();
-            let after_at = &trimmed[1..];
-            let rpe_part_end = after_at.find(' ').unwrap_or(after_at.len());
-            let rpe_part = &after_at[..rpe_part_end];
-            if let Ok(r) = rpe_part.parse::<f32>() {
-                rpe = Some(r);
-                let rpe_full = &trimmed[..1 + rpe_part_end];
-                let rest = trimmed.strip_prefix(rpe_full).unwrap_or(trimmed).trim();
-                final_comment = if rest.is_empty() { None } else { Some(rest.to_string()) };
-            }
+        && c.trim().starts_with('@')
+    {
+        let trimmed = c.trim();
+        let after_at = &trimmed[1..];
+        let rpe_part_end = after_at.find(' ').unwrap_or(after_at.len());
+        let rpe_part = &after_at[..rpe_part_end];
+        if let Ok(r) = rpe_part.parse::<f32>() {
+            rpe = Some(r);
+            let rpe_full = &trimmed[..1 + rpe_part_end];
+            let rest = trimmed.strip_prefix(rpe_full).unwrap_or(trimmed).trim();
+            final_comment = if rest.is_empty() {
+                None
+            } else {
+                Some(rest.to_string())
+            };
         }
+    }
     // Determine lb if any weights have lbs units
     // When user_wants_kg is false, weights without explicit units are in lbs
     let weights_without_unit_are_lbs = !options.user_wants_kg;

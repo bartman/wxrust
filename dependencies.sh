@@ -5,7 +5,7 @@ SUDO=
 [ "$(id -u)" = 0 ] || SUDO=sudo
 
 NEED=( cargo libssl-dev pkg-config )
-WANT=( rust-gdb entr rust-clippy )
+WANT=( rust-gdb entr rust-clippy rustfmt )
 
 set -x
 $SUDO apt update

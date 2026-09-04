@@ -1,4 +1,4 @@
-use chrono::{NaiveDate, Datelike};
+use chrono::{Datelike, NaiveDate};
 
 pub fn exit_with_error<E: std::fmt::Display>(error: E) -> ! {
     eprintln!("{}", error);
@@ -45,10 +45,18 @@ pub fn parse_date_boundary(s: &str, end: bool) -> Result<NaiveDate, String> {
         let compact = parts[0];
         if compact.len() == 8 {
             // YYYYMMDD
-            (compact[0..4].to_string(), compact[4..6].to_string(), compact[6..8].to_string())
+            (
+                compact[0..4].to_string(),
+                compact[4..6].to_string(),
+                compact[6..8].to_string(),
+            )
         } else if compact.len() == 6 {
             // YYYYMM
-            (compact[0..4].to_string(), compact[4..6].to_string(), "".to_string())
+            (
+                compact[0..4].to_string(),
+                compact[4..6].to_string(),
+                "".to_string(),
+            )
         } else if compact.len() == 4 {
             // YYYY
             (compact.to_string(), "".to_string(), "".to_string())
@@ -58,7 +66,11 @@ pub fn parse_date_boundary(s: &str, end: bool) -> Result<NaiveDate, String> {
     } else if parts.len() == 2 {
         (parts[0].to_string(), parts[1].to_string(), "".to_string())
     } else if parts.len() == 3 {
-        (parts[0].to_string(), parts[1].to_string(), parts[2].to_string())
+        (
+            parts[0].to_string(),
+            parts[1].to_string(),
+            parts[2].to_string(),
+        )
     } else if parts.is_empty() {
         return Err("Empty date string".to_string());
     } else {
@@ -88,15 +100,15 @@ pub fn parse_date_boundary(s: &str, end: bool) -> Result<NaiveDate, String> {
             NaiveDate::from_ymd_opt(year + 1, 1, 1).unwrap() - chrono::Duration::days(1)
         } else {
             NaiveDate::from_ymd_opt(year, month + 1, 1).unwrap() - chrono::Duration::days(1)
-        }.day();
+        }
+        .day();
 
         let day = if end { last_day } else { 1 };
         return Ok(NaiveDate::from_ymd_opt(year, month, day).unwrap());
     }
 
     let day: u32 = day_str.parse().map_err(|_| "Invalid day")?;
-    NaiveDate::from_ymd_opt(year, month, day)
-        .ok_or_else(|| "Invalid date".to_string())
+    NaiveDate::from_ymd_opt(year, month, day).ok_or_else(|| "Invalid date".to_string())
 }
 
 pub fn create_progress_bar(len: u64) -> indicatif::ProgressBar {
