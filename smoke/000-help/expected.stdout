@@ -13,9 +13,9 @@ Commands:
 Options:
   -c, --credentials <FILE>    Path to credentials.txt (email on line 1, password on line 2)
   -a, --force-authentication  Ignore the cached auth token and log in again
-      --no-network            Do not connect to the server; use local cache only
-      --no-cache              Do not read workouts from the local cache
-      --no-cache-write        Do not write fetched workouts to the local cache
+  -N, --no-network            Do not connect to the server; use local cache only
+  -C, --no-cache              Do not read workouts from the local cache
+  -W, --no-cache-write        Do not write fetched workouts to the local cache
       --color <COLOR>         When to color output: auto, always, never [default: auto]
   -v, --verbose               Enable debug output
   -h, --help                  Print help

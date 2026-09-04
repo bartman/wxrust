@@ -28,15 +28,15 @@ struct Args {
     force_auth: bool,
 
     /// Do not connect to the server; use local cache only
-    #[arg(long)]
+    #[arg(short = 'N', long)]
     no_network: bool,
 
     /// Do not read workouts from the local cache
-    #[arg(long)]
+    #[arg(short = 'C', long)]
     no_cache: bool,
 
     /// Do not write fetched workouts to the local cache
-    #[arg(long)]
+    #[arg(short = 'W', long)]
     no_cache_write: bool,
 
     /// When to color output: auto, always, never
