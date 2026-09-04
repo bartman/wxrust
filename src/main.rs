@@ -13,7 +13,7 @@ mod list;
 use clap::{Parser, Subcommand};
 
 use wxrust::credentials;
-use crate::api::{ReqwestClient, ApiClient};
+use crate::api::ReqwestClient;
 
 #[derive(Parser)]
 #[command(name = "wxrust")]
@@ -93,10 +93,7 @@ async fn setup_auth_and_data_access(
             Ok(claims) => claims.id,
             Err(e) => utils::exit_with_error(format!("Failed to decode token: {}", e)),
         };
-        let _user = match client.get_user_info(&token).await {
-            Ok(u) => u,
-            Err(e) => utils::exit_with_error(e),
-        };
+        // Unit preference is loaded lazily (cached, or getSession on first use).
         (Some(token), Some(uid))
     };
 
@@ -321,7 +318,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match args.command {
         Commands::List(list) => {
-            list::handle_list(&list, &client, &token, data_access, args.verbose).await;
+            list::handle_list(&list, data_access, args.verbose).await;
         },
         Commands::Show(show) => {
             handle_show(&show, data_access, args.verbose).await;
@@ -330,7 +327,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             handle_fetch(&fetch_args, data_access, args.verbose).await;
         },
         Commands::Table(table_args) => {
-            table::handle_table(&client, &token, data_access, &table_args.args, &table_args.dream, args.verbose).await;
+            table::handle_table(data_access, &table_args.args, &table_args.dream, args.verbose).await;
         },
         Commands::Heatmap(heatmap_args) => {
             // Determine metric - default to OneRm
@@ -349,8 +346,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
 
             heatmap::handle_heatmap(
-                &client,
-                &token,
                 data_access,
                 metric,
                 heatmap_args.green,

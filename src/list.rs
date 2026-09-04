@@ -1,15 +1,12 @@
-use crate::api::ReqwestClient;
-use crate::models;
+use crate::api::ApiClient;
 use crate::workouts;
 use crate::utils;
 use crate::formatters;
 use crate::table::{parse_date_and_filter_arguments, matches_any_filter};
 
-pub async fn handle_list(
+pub async fn handle_list<C: ApiClient>(
     list: &crate::ListArgs,
-    client: &ReqwestClient,
-    token: &Option<String>,
-    data_access: crate::api::DataAccess<'_, ReqwestClient>,
+    data_access: crate::api::DataAccess<'_, C>,
     verbose: bool,
 ) {
     let (date_args, filters) = parse_date_and_filter_arguments(&list.args);
@@ -45,136 +42,52 @@ pub async fn handle_list(
         utils::exit_with_error("No workouts found in the specified range");
     }
 
-    // If filters are present, we need to filter dates based on workout content
-    let filtered_dates = if filters.is_empty() {
-        dates_to_use
-    } else {
-        // Need to fetch workouts to check for matching exercises
-        let _user_wants_kg = workouts::resolve_user_wants_kg(&data_access).await;
-        let (tx, mut rx) = tokio::sync::mpsc::channel(32);
-        let filters_clone = filters.clone();
-        for (seq, date) in dates_to_use.iter().enumerate() {
-            let date = date.clone();
-            let client_clone = client.clone();
-            let token_clone = token.clone();
-            let verbose = verbose;
-            let use_network = data_access.use_network;
-            let use_cache = data_access.use_cache;
-            let write_cache = data_access.write_cache;
-            let uid = data_access.uid;
-            let tx_clone = tx.clone();
-            let filters_clone = filters_clone.clone();
-            tokio::spawn(async move {
-                let data_access_clone = crate::api::DataAccess {
-                    client: &client_clone,
-                    token: token_clone.as_deref(),
-                    uid,
-                    use_network,
-                    use_cache,
-                    write_cache,
-                };
-                let result = match workouts::get_jday(&data_access_clone, &date, verbose).await {
-                    Ok(jday) => {
-                        // Check if any exercise matches the filters
-                        let mut has_match = false;
-                        for eblock in &jday.eblocks {
-                            if let Some(ex) = jday.exercises.iter().find(|ex_wrap| ex_wrap.exercise.id == eblock.eid) {
-                                if matches_any_filter(&ex.exercise.name, &filters_clone) {
-                                    has_match = true;
-                                    break;
-                                }
-                            }
-                        }
-                        if has_match { Some(date.clone()) } else { None }
-                    }
-                    Err(e) => {
-                        eprintln!("Error getting workout for {}: {}", date, e);
-                        None
-                    }
-                };
-                tx_clone.send((seq, result)).await.unwrap();
-            });
+    if filters.is_empty() && !list.details && !list.summary {
+        for date in dates_to_use {
+            println!("{}", date);
         }
-        drop(tx);
-        use std::collections::BTreeMap;
-        let mut buffer: BTreeMap<usize, Option<String>> = BTreeMap::new();
-        let mut filtered = Vec::new();
-        let mut next_seq = 0;
-        while let Some((seq, result)) = rx.recv().await {
-            buffer.insert(seq, result);
-            while let Some(maybe_date) = buffer.remove(&next_seq) {
-                if let Some(date) = maybe_date {
-                    filtered.push(date);
-                }
-                next_seq += 1;
-            }
-        }
-        filtered
+        return;
+    }
+
+    let workouts = match workouts::get_jdays(&data_access, &dates_to_use, verbose).await {
+        Ok(w) => w,
+        Err(e) => utils::exit_with_error(e),
     };
 
-    if filtered_dates.is_empty() {
+    let workouts: Vec<_> = if filters.is_empty() {
+        workouts
+    } else {
+        workouts.into_iter().filter(|(_, jday)| {
+            jday.eblocks.iter().any(|eblock| {
+                jday.exercises.iter().any(|ex_wrap| {
+                    ex_wrap.exercise.id == eblock.eid
+                        && matches_any_filter(&ex_wrap.exercise.name, &filters)
+                })
+            })
+        }).collect()
+    };
+
+    if workouts.is_empty() {
         utils::exit_with_error("No workouts found matching the specified filters");
     }
 
     if list.details || list.summary {
         let user_wants_kg = workouts::resolve_user_wants_kg(&data_access).await;
-        let (tx, mut rx) = tokio::sync::mpsc::channel(32);
-        for (seq, date) in filtered_dates.iter().enumerate() {
-            let date = date.clone();
-            let client_clone = client.clone();
-            let token_clone = token.clone();
-            let verbose = verbose;
-            let use_network = data_access.use_network;
-            let use_cache = data_access.use_cache;
-            let write_cache = data_access.write_cache;
-            let uid = data_access.uid;
-            let tx_clone = tx.clone();
-            tokio::spawn(async move {
-                let data_access_clone = crate::api::DataAccess {
-                    client: &client_clone,
-                    token: token_clone.as_deref(),
-                    uid,
-                    use_network,
-                    use_cache,
-                    write_cache,
-                };
-                let result = match workouts::get_jday(&data_access_clone, &date, verbose).await {
-                    Ok(jday) => Some(jday),
-                    Err(e) => {
-                        eprintln!("Error getting workout for {}: {}", date, e);
-                        None
-                    }
-                };
-                tx_clone.send((seq, date.clone(), result)).await.unwrap();
-            });
-        }
-        drop(tx);
-        use std::collections::BTreeMap;
-        let mut buffer: BTreeMap<usize, (String, Option<models::JDay>)> = BTreeMap::new();
-        let mut next_seq = 0;
-        while let Some((seq, new_date, new_jday)) = rx.recv().await {
-            buffer.insert(seq, (new_date, new_jday));
-            while let Some((date, result)) = buffer.remove(&next_seq) {
-                let jday = match result {
-                    Some(jday) => jday,
-                    _ => continue
-                };
-                if list.details {
-                    let workout = formatters::format_workout(&date, &jday, user_wants_kg);
-                    println!("{}", workout);
-                    if !workout.ends_with('\n') {
-                        println!();
-                    }
-                } else if list.summary {
-                    let fmt_date = formatters::color_date(&date);
-                    let summary = formatters::summarize_workout(&jday, user_wants_kg, &filters);
-                    println!("{} {}", fmt_date, summary);
+        for (date, jday) in workouts {
+            if list.details {
+                let workout = formatters::format_workout(&date, &jday, user_wants_kg);
+                println!("{}", workout);
+                if !workout.ends_with('\n') {
+                    println!();
                 }
-                next_seq += 1;
+            } else {
+                let fmt_date = formatters::color_date(&date);
+                let summary = formatters::summarize_workout(&jday, user_wants_kg, &filters);
+                println!("{} {}", fmt_date, summary);
             }
         }
     } else {
-        for date in filtered_dates {
+        for (date, _) in workouts {
             println!("{}", date);
         }
     }
