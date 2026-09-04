@@ -81,7 +81,7 @@ async fn test_fetch_command_skips_cached() {
     };
 
     let dates = vec!["2023-10-01".to_string()];
-    let result = wxrust::fetch::fetch_command(&data_access, &dates, false, false, None, false).await;
+    let result = wxrust::fetch::fetch_command(&data_access, &dates, false, false, None, false, false).await;
     assert!(result.is_ok());
 
     restore_xdg(original_xdg_cache);
@@ -133,7 +133,7 @@ async fn test_fetch_command_fetches_and_caches() {
     };
 
     let dates = vec!["2023-10-01".to_string()];
-    let result = wxrust::fetch::fetch_command(&data_access, &dates, false, false, None, false).await;
+    let result = wxrust::fetch::fetch_command(&data_access, &dates, false, false, None, false, false).await;
     assert!(result.is_ok());
 
     let cache_path = temp_dir.path().join("wxrust").join("123").join("2023-10-01.txt");
@@ -160,7 +160,7 @@ async fn test_fetch_command_no_dates() {
         write_cache: false,
     };
 
-    let result = wxrust::fetch::fetch_command(&data_access, &["2023-10-01".to_string()], false, false, None, false).await;
+    let result = wxrust::fetch::fetch_command(&data_access, &["2023-10-01".to_string()], false, false, None, false, false).await;
     assert!(result.is_ok());
 
     restore_xdg(original_xdg_cache);
@@ -214,13 +214,84 @@ async fn test_fetch_command_force_refetches() {
         token: Some("token"),
         uid: Some(123),
         use_network: true,
-        use_cache: false,
+        use_cache: true,
         write_cache: false,
     };
 
     let dates = vec!["2023-10-01".to_string()];
-    let result = wxrust::fetch::fetch_command(&data_access, &dates, false, true, None, false).await;
+    let result = wxrust::fetch::fetch_command(&data_access, &dates, false, true, None, false, false).await;
     assert!(result.is_ok());
 
     restore_xdg(original_xdg_cache);
+}
+
+#[tokio::test]
+async fn test_fetch_command_without_force_skips_network() {
+    let _guard = ENV_MUTEX.lock().await;
+    let temp_dir = TempDir::new().unwrap();
+    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
+    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    forget_cached_user_wants_kg();
+
+    let cache_dir = temp_dir.path().join("wxrust").join("123");
+    fs::create_dir_all(&cache_dir).unwrap();
+    fs::write(
+        cache_dir.join("2023-10-01.txt"),
+        "2023-10-01\n@ 80 kg bw\n#Squat\n100 x 5\n",
+    ).unwrap();
+
+    let mut mock_client = MockApiClient::new();
+    mock_client
+        .expect_graphql_request::<wxrust::models::GetJRangeData>()
+        .times(1)
+        .returning(|_, _, _| {
+            Ok(GraphQLResponse {
+                data: Some(wxrust::models::GetJRangeData {
+                    jrange: Some(wxrust::models::JRangeData {
+                        days: Some(vec![wxrust::models::JRangeDayData {
+                            on: Some("2023-10-01".to_string()),
+                        }]),
+                    }),
+                }),
+                errors: None,
+            })
+        });
+    mock_client
+        .expect_graphql_request::<wxrust::models::BatchJDayData>()
+        .times(0);
+
+    let data_access = wxrust::api::DataAccess {
+        client: &mock_client,
+        token: Some("token"),
+        uid: Some(123),
+        use_network: true,
+        use_cache: true,
+        write_cache: false,
+    };
+
+    let dates = vec!["2023-10-01".to_string()];
+    let result = wxrust::fetch::fetch_command(&data_access, &dates, false, false, None, false, false).await;
+    assert!(result.is_ok());
+
+    restore_xdg(original_xdg_cache);
+}
+
+#[test]
+fn test_format_transfer_stats() {
+    assert_eq!(
+        wxrust::fetch::format_transfer_stats(152, 850_000, 1.15),
+        "152 workouts, 1.15 seconds, 132.2 T/s, 0.74 MB/s"
+    );
+    assert_eq!(
+        wxrust::fetch::format_transfer_stats(115, 1_150_000, 1.15),
+        "115 workouts, 1.15 seconds, 100.0 T/s, 1.00 MB/s"
+    );
+    assert_eq!(
+        wxrust::fetch::format_transfer_stats(10, 500_000, 0.0),
+        "10 workouts, 0.00 seconds, 0.0 T/s, 0.00 MB/s"
+    );
+    assert_eq!(
+        wxrust::fetch::format_transfer_stats(0, 0, 1.0),
+        "0 workouts, 1.00 seconds, 0.0 T/s, 0.00 MB/s"
+    );
 }
