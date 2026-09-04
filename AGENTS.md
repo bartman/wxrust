@@ -34,7 +34,7 @@ decodes the JWT token for user ID, queries the GraphQL API for workout data, and
   - Weights: #FF7900 (255,121,0)
   - Reps: #00BBF9 (0,187,249)
   - Sets: #F15BB5 (241,91,181)
-- **Performance**: Reuse HTTP client across requests to maintain connection pooling and avoid TCP overhead. Session-level caching of user preferences. Fetch packs up to 10 `jday` queries per GraphQL request (aliases) and runs 8 requests concurrently (`JDAY_BATCH_SIZE=10`, `FETCH_CONCURRENCY=8`). Sequential `jday` fetching of 152 workouts took ~19s; batched+concurrent takes ~1.2s for the workout downloads (~3.4s including date listing/auth). HTTP client uses a larger idle pool, TCP_NODELAY, and gzip.
+- **Performance**: Reuse HTTP client across requests to maintain connection pooling and avoid TCP overhead. Session-level caching of user preferences (`user_wants_kg`); `getSession` is lazy, not on every command. Fetch packs up to 10 `jday` queries per GraphQL request (aliases) and runs 8 requests concurrently (`JDAY_BATCH_SIZE=10`, `FETCH_CONCURRENCY=8`). Bounded `jrange` listing (`get_dates` with both oldest and latest, e.g. `table deadlift 2026`) splits the span into independent 32-week windows and fetches them concurrently (`jrange_windows`). `table` / `heatmap` / filtered `list` load workout bodies via `get_jdays` (cache hits stay local; misses use the same batched path as `fetch`) instead of one GraphQL request per date. Sequential `jday` fetching of 152 workouts took ~19s; batched+concurrent takes ~1.2s for the workout downloads. Network slowness on a warm cache is date listing + auth, not parsing. HTTP client uses a larger idle pool, TCP_NODELAY, and gzip.
 - **Rust Implementation**: Used reqwest for HTTP with client reuse, serde for JSON, base64 for JWT decoding, ansi_term for colors, atty for TTY detection. Handled GraphQL responses, error checking, and inline color application during text generation.
 
 ## Referenced Links
@@ -175,6 +175,7 @@ Recent refactoring extracted common code into helper functions to improve mainta
 - **Common Helpers**:
   - `workouts::resolve_user_wants_kg`: Consolidates logic for determining user weight unit preference, checking network token then falling back to cache.
   - `workouts::get_dates_from_ranges`: Unified logic for parsing date ranges and fetching/calculating dates, used by both `list` and `fetch` commands.
+  - `workouts::jrange_windows` / `fetch_jrange_windows`: Split a bounded date range into concurrent `jrange` week-windows (max 32 weeks each).
   - `workouts::format_cached_jday_text` / `read_cached_jday_text`: Cache file text used by `write_cached_jday` and `fetch --diff`.
   - `fetch::format_text_diff`: Unified-style diff; returns `None` when local and server texts are identical.
   - `utils::create_progress_bar`: Standardized progress bar creation using `indicatif`.
@@ -203,7 +204,7 @@ Unlike the C version which shows separate tables per filter, the Rust implementa
 
 ## Future Improvements
 
-- Parallelize `get_dates` jrange pagination (currently sequential week-windows).
+- Parallelize unbounded `get_dates` jrange pagination (bounded ranges already use concurrent windows; full-history listing is still sequential).
 - Optionally use `downloadLogs` for full-history `fetch` with no date filter.
 - Add support for year/month range queries.
 - Add export options (JSON, CSV).
