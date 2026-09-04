@@ -59,9 +59,14 @@ Create a `credentials.txt` file with your WeightXReps account email on the first
 - `-N, --no-network`: Skip network access, use cache only (workouts and dates come from local cache)
 - `-C, --no-cache`: Skip cache lookup, fetch all data from server (writes still happen unless `--no-cache-write` is also used)
 - `-W, --no-cache-write`: Disable cache writes (reads still happen unless `--no-cache` is also used)
+- `-s, --scan-days <DAYS>`: How many days to scan for new workout dates before using the cache (default: `0`). Must appear before the subcommand, like other global flags (`wxrust -s 7 table deadlift`). `list`/`show` `-s` is still `--summary`.
+  - `-s 0`: scan from the last cached workout through today (skips the network if the cache already has today)
+  - `-s 7`: scan the last 7 days (and still use cached dates for older history)
+  - `-s -1`: list dates from the server over the full requested range
+  - `-s 0` with `--no-cache` or an empty cache falls back to a full scan
 - `--color <always|never|auto>`: Control color output (default: auto, based on TTY)
 
-**Note:** `--no-network` and `--no-cache` are mutually exclusive.
+**Note:** `--no-network` and `--no-cache` are mutually exclusive. `--no-network` ignores `--scan-days`.
 
 ### Commands
 
@@ -87,7 +92,8 @@ Create a `credentials.txt` file with your WeightXReps account email on the first
 #### Fetch Workouts
 
 - Fetch and cache workouts for 2025: `wxrust fetch 2025`
-- Fetch all workouts: `wxrust fetch`
+- Fetch new workouts since the last cached date: `wxrust fetch` (default `-s 0`)
+- Fetch the full history: `wxrust -s -1 fetch`
 - Show diff between local and server: `wxrust fetch --diff 2025-10` (only workouts whose cache file would change)
 - Force re-download: `wxrust fetch --force 2025`
 - Import from text export file: `wxrust fetch --file export.txt`
@@ -105,7 +111,7 @@ Display a progression table showing personal records (PRs) over time for specifi
 - Filter by date range: `wxrust table 2025`
 - Combine date and exercise filters: `wxrust table 2025 deadlift`
 
-`table` (and `heatmap` / filtered `list`) list dates with concurrent `jrange` windows, then load workouts through the same batched `jday` path as `fetch`. Cached days stay local; `--no-network` skips the date listing round-trip entirely.
+`table` (and `heatmap` / filtered `list`) list dates from the local cache and scan only recent days for new workouts (`--scan-days`, default 0). `-s -1` lists dates with concurrent `jrange` windows over the full range. Workout bodies load through the same batched `jday` path as `fetch`; cached days stay local. `--no-network` skips the date listing round-trip entirely.
 
 Arguments are automatically classified as dates or exercise filters:
 - **Date formats**: `YYYY`, `YYYY-MM`, `YYYY.MM`, `YYYYMM`, `YYYY-MM-DD`, `YYYY.MM.DD`, `YYYYMMDD`

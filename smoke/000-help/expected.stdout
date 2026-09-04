@@ -16,6 +16,7 @@ Options:
   -N, --no-network            Do not connect to the server; use local cache only
   -C, --no-cache              Do not read workouts from the local cache
   -W, --no-cache-write        Do not write fetched workouts to the local cache
+  -s, --scan-days <DAYS>      Days to scan for new workouts (0=since last cached, -1=full history) [default: 0]
       --color <COLOR>         When to color output: auto, always, never [default: auto]
   -v, --verbose               Enable debug output
   -h, --help                  Print help
