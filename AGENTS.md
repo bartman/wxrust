@@ -21,8 +21,10 @@ decodes the JWT token for user ID, queries the GraphQL API for workout data, and
 - **API Structure**: WeightXReps uses GraphQL at `/api/graphql` for all data operations. Authentication via JWT tokens in Authorization headers.
 - **Authentication**: Login mutation `login(u: $u, p: $p)` returns a JWT token containing user ID in the `id` field.
 - **Data Retrieval**:
-  - `JDay` query fetches workouts by user ID and date (YMD format: YYYY-MM-DD). Includes structured data like eblocks (exercise blocks), sets, exercises, and a pre-formatted log.
-  - `jrange` query fetches a range of workout days around a given date, with configurable count (max 32). Returns days with workouts in the range.
+  - `JDay` query fetches workouts by user ID and date (YMD format: YYYY-MM-DD). Includes structured data like eblocks (exercise blocks), sets, exercises, and a pre-formatted log (comments live here).
+  - `jrange` query fetches range data between `ymd - range*7` and `ymd`. **`range` is in weeks, max 32** (32 weeks ≈ 224 days), not a workout-day count. Returns days with workouts in the window. `jrange` includes eblocks/sets/exercises but **not** the `log` field, so it cannot replace `jday` for cache-accurate fetches.
+  - GraphQL aliases work: one request can fetch many `jday` selections (`d0: jday(...) { ... } d1: jday(...) { ... }`).
+  - `downloadLogs` returns all of the current user's logs as `JEditorData` in one request (used by the website export). Not used by fetch because converting JEditorData can diverge from `jday` cache format.
 - **Data Formatting**: Workout logs are formatted text with #exercise prefixes and compressed set notations (e.g., 135x5x3 or 445x1,3). Formatting logic found in client code.
 - **Color Scheme**: Website editor uses specific RGB colors for syntax highlighting:
   - Date: #9D4EDD (157,78,221)
@@ -31,7 +33,7 @@ decodes the JWT token for user ID, queries the GraphQL API for workout data, and
   - Weights: #FF7900 (255,121,0)
   - Reps: #00BBF9 (0,187,249)
   - Sets: #F15BB5 (241,91,181)
-- **Performance**: Reuse HTTP client across requests to maintain connection pooling and avoid TCP overhead. Implemented concurrent API fetching for multiple workouts and session-level caching of user preferences to reduce latency and redundant calls.
+- **Performance**: Reuse HTTP client across requests to maintain connection pooling and avoid TCP overhead. Session-level caching of user preferences. Fetch packs up to 10 `jday` queries per GraphQL request (aliases) and runs 8 requests concurrently (`JDAY_BATCH_SIZE=10`, `FETCH_CONCURRENCY=8`). Sequential `jday` fetching of 152 workouts took ~19s; batched+concurrent takes ~1.2s for the workout downloads (~3.4s including date listing/auth). HTTP client uses a larger idle pool, TCP_NODELAY, and gzip.
 - **Rust Implementation**: Used reqwest for HTTP with client reuse, serde for JSON, base64 for JWT decoding, ansi_term for colors, atty for TTY detection. Handled GraphQL responses, error checking, and inline color application during text generation.
 
 ## Referenced Links
@@ -72,7 +74,7 @@ You can look in `weightxreps-client/src/data/generated---db-types-and-hooks.tsx`
 - Ensures ordered output in list commands by buffering concurrent async requests to maintain sequence.
 - Local caching of structured workout data in XDG_CACHE_HOME/wxrust/{uid}/yyyy-mm-dd.txt for offline access and performance.
 - Cache format is text, same as what is formatted for output using `format_workout_for_cache`
-- Bulk fetch command to download workouts from server into cache, with options for diff, force, and file import
+- Bulk fetch command to download workouts from server into cache, with options for diff, force, and file import. Fetch skips already-cached dates by checking file existence (no parse). Network fetches use batched concurrent `jday` queries.
 - Progress bars for long-running operations using indicatif
 - Side-by-side diff display using similar crate for comparing local and server workouts
 - Parsing and formatting support for RPE (@ syntax), BW exercises (BW, BW+, BW-), lb/kg units
@@ -85,7 +87,8 @@ You can look in `weightxreps-client/src/data/generated---db-types-and-hooks.tsx`
 
 ## Dependencies Added
 
-- `reqwest` (0.12) with JSON features for HTTP requests and client reuse.
+- `reqwest` (0.12) with JSON and gzip features for HTTP requests and client reuse.
+- `futures` (0.3) for concurrent batched GraphQL streams (`buffer_unordered`).
 - `serde` (1.0) with derive for JSON serialization/deserialization.
 - `base64` (0.21) for JWT payload decoding.
 - `tokio` (1) for async runtime.
@@ -196,6 +199,8 @@ Unlike the C version which shows separate tables per filter, the Rust implementa
 
 ## Future Improvements
 
+- Parallelize `get_dates` jrange pagination (currently sequential week-windows).
+- Optionally use `downloadLogs` for full-history `fetch` with no date filter.
 - Add support for year/month range queries.
 - Add export options (JSON, CSV).
 - Support for user profile and goals queries.
