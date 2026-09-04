@@ -25,6 +25,7 @@ decodes the JWT token for user ID, queries the GraphQL API for workout data, and
   - `jrange` query fetches range data between `ymd - range*7` and `ymd`. **`range` is in weeks, max 32** (32 weeks ≈ 224 days), not a workout-day count. Returns days with workouts in the window. `jrange` includes eblocks/sets/exercises but **not** the `log` field, so it cannot replace `jday` for cache-accurate fetches.
   - GraphQL aliases work: one request can fetch many `jday` selections (`d0: jday(...) { ... } d1: jday(...) { ... }`).
   - `downloadLogs` returns all of the current user's logs as `JEditorData` in one request (used by the website export). Not used by fetch because converting JEditorData can diverge from `jday` cache format.
+  - **No last-modified timestamp on logs.** Schema type `JLog` (`jday`) is only `id`, `log`, `fromMobile`, `bw`, `eblocks`, `exercises`, `utags`, `utagsValues`. `JRangeDayData` is only `on` and `did`. `JLog.id` is a stable logid for comments/likes, not a version. `getActivityFeed` has `UCard.when` (UTCDate) + `posted` (YMD) but that is the social feed (`following`/`global`), not a per-log mtime and not a full history. Cache skip therefore cannot compare remote mtime vs file mtime; `fetch` skips on cache file existence unless `--force`/`--diff`.
 - **Data Formatting**: Workout logs are formatted text with #exercise prefixes and compressed set notations (e.g., 135x5x3 or 445x1,3). Formatting logic found in client code.
 - **Color Scheme**: Website editor uses specific RGB colors for syntax highlighting:
   - Date: #9D4EDD (157,78,221)
@@ -208,5 +209,6 @@ Unlike the C version which shows separate tables per filter, the Rust implementa
 - Support for other set types (WxD, WxT, etc.).
 - Support for tags, time/distance sets.
 - DELETE keyword handling in cache management.
+- Cache invalidation without a remote mtime: refetch recent dates always, or ask upstream for `updatedAt` on `JLog` / `JRangeDayData`.
 
 
