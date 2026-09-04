@@ -3,19 +3,19 @@ WeightXReps Rust client
 Usage: wxrust [OPTIONS] <COMMAND>
 
 Commands:
-  list     
-  show     
-  fetch    
-  table    
-  heatmap  
+  list     List workout dates, optionally with details or summaries
+  show     Show a workout log for a date (defaults to the most recent)
+  fetch    Download workouts from the server into the local cache
+  table    Display personal-record progression as a table
+  heatmap  Display a calendar heatmap of workout intensity
   help     Print this message or the help of the given subcommand(s)
 
 Options:
-  -c, --credentials <CREDENTIALS>  Where to find credentials.txt file
-  -a, --force-authentication       Do not use cached auth token
-      --no-network                 Not allowed to connect to server
-      --no-cache                   Not allosed to read from cache
-      --no-cache-write             Not allowed to write to cache
-      --color <COLOR>              Color output policy: auto, always, never [default: auto]
-  -v, --verbose                    Enable debug output
-  -h, --help                       Print help
+  -c, --credentials <FILE>    Path to credentials.txt (email on line 1, password on line 2)
+  -a, --force-authentication  Ignore the cached auth token and log in again
+      --no-network            Do not connect to the server; use local cache only
+      --no-cache              Do not read workouts from the local cache
+      --no-cache-write        Do not write fetched workouts to the local cache
+      --color <COLOR>         When to color output: auto, always, never [default: auto]
+  -v, --verbose               Enable debug output
+  -h, --help                  Print help

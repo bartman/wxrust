@@ -19,25 +19,32 @@ use crate::api::{ReqwestClient, ApiClient};
 #[command(name = "wxrust")]
 #[command(about = "WeightXReps Rust client")]
 struct Args {
-    #[arg(short, long, help = "Where to find credentials.txt file")]
+    /// Path to credentials.txt (email on line 1, password on line 2)
+    #[arg(short, long, value_name = "FILE")]
     credentials: Option<String>,
 
-    #[arg(short = 'a', long = "force-authentication", help = "Do not use cached auth token")]
+    /// Ignore the cached auth token and log in again
+    #[arg(short = 'a', long = "force-authentication")]
     force_auth: bool,
 
-    #[arg(long, help = "Not allowed to connect to server")]
+    /// Do not connect to the server; use local cache only
+    #[arg(long)]
     no_network: bool,
 
-    #[arg(long, help = "Not allosed to read from cache")]
+    /// Do not read workouts from the local cache
+    #[arg(long)]
     no_cache: bool,
 
-    #[arg(long, help = "Not allowed to write to cache")]
+    /// Do not write fetched workouts to the local cache
+    #[arg(long)]
     no_cache_write: bool,
 
-    #[arg(long, default_value = "auto", help = "Color output policy: auto, always, never")]
+    /// When to color output: auto, always, never
+    #[arg(long, default_value = "auto")]
     color: String,
 
-    #[arg(short, long, help = "Enable debug output")]
+    /// Enable debug output
+    #[arg(short, long)]
     verbose: bool,
 
     #[command(subcommand)]
@@ -46,10 +53,15 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// List workout dates, optionally with details or summaries
     List(ListArgs),
+    /// Show a workout log for a date (defaults to the most recent)
     Show(ShowArgs),
+    /// Download workouts from the server into the local cache
     Fetch(FetchArgs),
+    /// Display personal-record progression as a table
     Table(TableArgs),
+    /// Display a calendar heatmap of workout intensity
     Heatmap(HeatmapArgs),
 }
 
@@ -93,85 +105,103 @@ async fn setup_auth_and_data_access(
 
 #[derive(Parser)]
 struct ListArgs {
+    /// Print the full workout log for each date
     #[arg(short, long)]
     details: bool,
 
+    /// Print a one-line summary of each workout
     #[arg(short, long)]
     summary: bool,
 
+    /// List oldest first instead of newest first
     #[arg(short, long)]
     reverse: bool,
 
+    /// List all workout dates (no count limit)
     #[arg(short = 'A', long)]
     all: bool,
 
-    #[arg(short, long)]
+    /// Only include workouts before this date (YYYY-MM-DD)
+    #[arg(short, long, value_name = "DATE")]
     before: Option<String>,
 
-    #[arg(short, long)]
+    /// Maximum number of dates to list (default: 32)
+    #[arg(short, long, value_name = "N")]
     count: Option<u32>,
 
-    /// filter on dates (YYYY, YYYY-MM, YYYY-MM-DD, etc.) or exercise names (or substrings)
+    /// Date filters (YYYY, YYYY-MM, YYYY-MM-DD, 2025..2026) or exercise name substrings
     args: Vec<String>,
 }
 
 #[derive(Parser)]
 struct ShowArgs {
+    /// Print a one-line summary instead of the full workout log
     #[arg(short, long)]
     summary: bool,
 
+    /// Workout date (YYYY-MM-DD). Defaults to the most recent workout
     date: Option<String>,
 }
 
 #[derive(Parser)]
 struct FetchArgs {
+    /// Compare local cache to the server instead of downloading
     #[arg(long)]
     diff: bool,
 
+    /// Re-download workouts even if they are already cached
     #[arg(long)]
     force: bool,
 
+    /// Import workouts from a text export file instead of the server
     #[arg(long, value_name = "FILE")]
     file: Option<String>,
 
-    #[arg(long, help = "Print transfer rate (T/s, MB/s) after fetch")]
+    /// Print transfer rate (T/s, MB/s) after fetch
+    #[arg(long)]
     stats: bool,
 
+    /// Dates or ranges to fetch (YYYY, YYYY-MM, YYYY-MM-DD, 2025..). Defaults to all
     dates: Vec<String>,
 }
 
 #[derive(Parser)]
 struct TableArgs {
-
-    /// provide a 1RM or Weight x Reps, and see how it stacks up
-    #[arg(long)]
+    /// Hypothetical 1RM or set to compare against PRs (e.g. 500, 315x5); may be repeated
+    #[arg(long, value_name = "SET")]
     dream: Vec<String>,
 
-    /// filter on dates (YYYY, YYYY-MM, YYYY-MM-DD, etc.) or exercise names (or substrings)
+    /// Date filters (YYYY, YYYY-MM, YYYY-MM-DD, 2025..2026) or exercise name substrings
     args: Vec<String>,
 }
 
 #[derive(Parser)]
 struct HeatmapArgs {
+    /// Color days by number of sets
     #[arg(long, group = "metric")]
     sets: bool,
 
+    /// Color days by total reps
     #[arg(long, group = "metric")]
     reps: bool,
 
+    /// Color days by volume (weight x reps x sets)
     #[arg(long, group = "metric")]
     volume: bool,
 
+    /// Color days by heaviest weight
     #[arg(long, group = "metric")]
     weight: bool,
 
+    /// Color days by estimated 1RM (default)
     #[arg(long, group = "metric")]
     onerm: bool,
 
+    /// Use a green RGB gradient instead of the default solarized colors
     #[arg(long)]
     green: bool,
 
-    /// filter on dates (YYYY, YYYY-MM, YYYY-MM-DD, etc.) or exercise names (or substrings)
+    /// Date filters (YYYY, YYYY-MM, YYYY-MM-DD, 2025..2026) or exercise name substrings
     args: Vec<String>,
 }
 
