@@ -1,8 +1,8 @@
-use wxrust::parsers::*;
 use wxrust::formatters::*;
-use wxrust::models::{JDay, Set, Exercise, ExerciseWrapper, EBlock};
-use wxrust::workouts::{forget_cached_user_wants_kg, write_cached_user_wants_kg};
+use wxrust::models::{EBlock, Exercise, ExerciseWrapper, JDay, Set};
 use wxrust::parsers::LBS_PER_KG;
+use wxrust::parsers::*;
+use wxrust::workouts::{forget_cached_user_wants_kg, write_cached_user_wants_kg};
 
 fn roughly_equal(a: f32, b: f32, tolerance: f32) -> bool {
     (a - b).abs() < tolerance
@@ -39,10 +39,19 @@ fn test_round_trip() {
         name: "lat-pulldown".to_string(),
         ex_type: None,
     };
-    let ex_wrapper1 = ExerciseWrapper { exercise: exercise1 };
-    let sets1 = vec![
-        Set { w: Some(175.0), r: Some(10), s: Some(3), lb: Some(0.0), rpe: None, c: None, set_type: Some(0), usebw: None },
-    ];
+    let ex_wrapper1 = ExerciseWrapper {
+        exercise: exercise1,
+    };
+    let sets1 = vec![Set {
+        w: Some(175.0),
+        r: Some(10),
+        s: Some(3),
+        lb: Some(0.0),
+        rpe: None,
+        c: None,
+        set_type: Some(0),
+        usebw: None,
+    }];
     let eblock1 = EBlock {
         eid: "lat-pulldown".to_string(),
         sets: sets1,
@@ -52,10 +61,19 @@ fn test_round_trip() {
         name: "cable-low-row".to_string(),
         ex_type: None,
     };
-    let ex_wrapper2 = ExerciseWrapper { exercise: exercise2 };
-    let sets2 = vec![
-        Set { w: Some(175.0), r: Some(10), s: Some(3), lb: Some(0.0), rpe: None, c: None, set_type: Some(0), usebw: None },
-    ];
+    let ex_wrapper2 = ExerciseWrapper {
+        exercise: exercise2,
+    };
+    let sets2 = vec![Set {
+        w: Some(175.0),
+        r: Some(10),
+        s: Some(3),
+        lb: Some(0.0),
+        rpe: None,
+        c: None,
+        set_type: Some(0),
+        usebw: None,
+    }];
     let eblock2 = EBlock {
         eid: "cable-low-row".to_string(),
         sets: sets2,
@@ -73,7 +91,9 @@ fn test_round_trip() {
     write_cached_user_wants_kg(false);
 
     // Format to full text (simulate render_workout without color)
-    unsafe { std::env::set_var("WXRUST_COLOR", "never"); }
+    unsafe {
+        std::env::set_var("WXRUST_COLOR", "never");
+    }
     let _user = wxrust::models::User { usekg: Some(1) };
     let full_formatted_text = format_workout_for_cache("2025-01-21", &original_jday);
 
@@ -111,7 +131,10 @@ TM: 495
     // The parsed JDay should have the correct structure
     assert_eq!(parsed_jday.bw, Some(105.0));
     assert_eq!(parsed_jday.exercises.len(), 1);
-    assert_eq!(parsed_jday.exercises[0].exercise.name, "safety-squat #sq #SQ");
+    assert_eq!(
+        parsed_jday.exercises[0].exercise.name,
+        "safety-squat #sq #SQ"
+    );
     assert_eq!(parsed_jday.eblocks.len(), 1);
     assert_eq!(parsed_jday.eblocks[0].eid, "safety-squat #sq #SQ");
     assert_eq!(parsed_jday.eblocks[0].sets.len(), 6); // 165x10, 255x5, 305x3, 360x3, 415x3, 455x6
@@ -121,7 +144,9 @@ TM: 495
     assert_eq!(parsed_jday.log, expected_log);
 
     // Format back and check it matches the input
-    unsafe { std::env::set_var("WXRUST_COLOR", "never"); }
+    unsafe {
+        std::env::set_var("WXRUST_COLOR", "never");
+    }
     let reformatted = format_workout_no_color("2025-12-26", &parsed_jday, true);
     assert_eq!(reformatted, cache_text);
 }
@@ -152,20 +177,26 @@ TM: 485
     // The parsed JDay should have the correct structure
     assert_eq!(parsed_jday.bw, Some(102.9656));
     assert_eq!(parsed_jday.exercises.len(), 1);
-    assert_eq!(parsed_jday.exercises[0].exercise.name, "safety-box-squat #sq");
+    assert_eq!(
+        parsed_jday.exercises[0].exercise.name,
+        "safety-box-squat #sq"
+    );
     assert_eq!(parsed_jday.eblocks.len(), 1);
     assert_eq!(parsed_jday.eblocks[0].eid, "safety-box-squat #sq");
     assert_eq!(parsed_jday.eblocks[0].sets.len(), 7); // 195x10, 245x5, 295x3, 375x5, 425x3, 472x7, 375x5
 
     // Check some sets
-    assert_eq!(parsed_jday.eblocks[0].sets[0].w, Some(195.0/LBS_PER_KG));
+    assert_eq!(parsed_jday.eblocks[0].sets[0].w, Some(195.0 / LBS_PER_KG));
     assert_eq!(parsed_jday.eblocks[0].sets[0].r, Some(10));
     assert_eq!(parsed_jday.eblocks[0].sets[0].s, Some(1));
-    assert_eq!(parsed_jday.eblocks[0].sets[5].w, Some(472.0/LBS_PER_KG));
+    assert_eq!(parsed_jday.eblocks[0].sets[5].w, Some(472.0 / LBS_PER_KG));
     assert_eq!(parsed_jday.eblocks[0].sets[5].r, Some(7));
     assert_eq!(parsed_jday.eblocks[0].sets[5].s, Some(1));
-    assert_eq!(parsed_jday.eblocks[0].sets[5].c, Some("hard, but rewarding".to_string()));
-    assert_eq!(parsed_jday.eblocks[0].sets[6].w, Some(375.0/LBS_PER_KG));
+    assert_eq!(
+        parsed_jday.eblocks[0].sets[5].c,
+        Some("hard, but rewarding".to_string())
+    );
+    assert_eq!(parsed_jday.eblocks[0].sets[6].w, Some(375.0 / LBS_PER_KG));
     assert_eq!(parsed_jday.eblocks[0].sets[6].r, Some(5));
     assert_eq!(parsed_jday.eblocks[0].sets[6].s, Some(1));
     assert_eq!(parsed_jday.eblocks[0].sets[6].c, Some("AMRAP".to_string()));
@@ -206,8 +237,14 @@ shoulders need more work
     assert_eq!(parsed_jday.bw, Some(102.9656));
     assert_eq!(parsed_jday.exercises.len(), 3);
     assert_eq!(parsed_jday.exercises[0].exercise.name, "cambered-ohp #ohp");
-    assert_eq!(parsed_jday.exercises[1].exercise.name, "dumbbell-side-raise");
-    assert_eq!(parsed_jday.exercises[2].exercise.name, "weight-plate-front-raise");
+    assert_eq!(
+        parsed_jday.exercises[1].exercise.name,
+        "dumbbell-side-raise"
+    );
+    assert_eq!(
+        parsed_jday.exercises[2].exercise.name,
+        "weight-plate-front-raise"
+    );
     assert_eq!(parsed_jday.eblocks.len(), 3);
     assert_eq!(parsed_jday.eblocks[0].eid, "cambered-ohp #ohp");
     assert_eq!(parsed_jday.eblocks[0].sets.len(), 7); // 70x10, 90x5, 110x3, 119x5, 138x5, 156x7, 120x10
@@ -217,12 +254,12 @@ shoulders need more work
     assert_eq!(parsed_jday.eblocks[2].sets.len(), 1); // 25x10x3
 
     // Check some sets
-    assert_eq!(parsed_jday.eblocks[0].sets[0].w, Some(70.0/LBS_PER_KG));
+    assert_eq!(parsed_jday.eblocks[0].sets[0].w, Some(70.0 / LBS_PER_KG));
     assert_eq!(parsed_jday.eblocks[0].sets[0].r, Some(10));
     assert_eq!(parsed_jday.eblocks[0].sets[6].c, Some("AMRAP".to_string()));
-    assert_eq!(parsed_jday.eblocks[1].sets[0].w, Some(5.0/LBS_PER_KG));
+    assert_eq!(parsed_jday.eblocks[1].sets[0].w, Some(5.0 / LBS_PER_KG));
     assert_eq!(parsed_jday.eblocks[1].sets[0].r, Some(10));
-    assert_eq!(parsed_jday.eblocks[2].sets[0].w, Some(25.0/LBS_PER_KG));
+    assert_eq!(parsed_jday.eblocks[2].sets[0].w, Some(25.0 / LBS_PER_KG));
     assert_eq!(parsed_jday.eblocks[2].sets[0].r, Some(10));
     assert_eq!(parsed_jday.eblocks[2].sets[0].s, Some(3));
 
@@ -340,16 +377,19 @@ TM: 465
     // The parsed JDay should have the correct structure
     assert_eq!(parsed_jday.bw, Some(100.69763));
     assert_eq!(parsed_jday.exercises.len(), 1);
-    assert_eq!(parsed_jday.exercises[0].exercise.name, "safety-box-squat #sq");
+    assert_eq!(
+        parsed_jday.exercises[0].exercise.name,
+        "safety-box-squat #sq"
+    );
     assert_eq!(parsed_jday.eblocks.len(), 1);
     assert_eq!(parsed_jday.eblocks[0].eid, "safety-box-squat #sq");
     assert_eq!(parsed_jday.eblocks[0].sets.len(), 8); // 135x10, 235x5, 285x3, 350x5, 405x3, 445x1, 445x3, 350x5
 
     // Check the compressed reps sets
-    assert_eq!(parsed_jday.eblocks[0].sets[5].w, Some(445.0/LBS_PER_KG));
+    assert_eq!(parsed_jday.eblocks[0].sets[5].w, Some(445.0 / LBS_PER_KG));
     assert_eq!(parsed_jday.eblocks[0].sets[5].r, Some(1));
     assert_eq!(parsed_jday.eblocks[0].sets[5].s, Some(1));
-    assert_eq!(parsed_jday.eblocks[0].sets[6].w, Some(445.0/LBS_PER_KG));
+    assert_eq!(parsed_jday.eblocks[0].sets[6].w, Some(445.0 / LBS_PER_KG));
     assert_eq!(parsed_jday.eblocks[0].sets[6].r, Some(3));
     assert_eq!(parsed_jday.eblocks[0].sets[6].s, Some(1));
     assert_eq!(parsed_jday.eblocks[0].sets[7].c, Some("AMRAP".to_string()));
@@ -370,7 +410,9 @@ TM: 415
 135 x 10
 185, 225 x 5
 285, 335, 375 x 3
-"#.to_string() + "\n";
+"#
+    .to_string()
+        + "\n";
 
     // Parse the cache text
     let parsed_jday = parse_workout(&cache_text).unwrap();
@@ -437,8 +479,8 @@ fn test_parse_units() {
     // Test units
     let sets = parse_set_line("405 lb x 5").unwrap();
     assert_eq!(sets.len(), 1);
-    assert_eq!(sets[0].w, Some(405.0/LBS_PER_KG)); // w is always in kg
-    assert_eq!(sets[0].lb, Some(1.0));             // lb==1 if user entered it in lbs
+    assert_eq!(sets[0].w, Some(405.0 / LBS_PER_KG)); // w is always in kg
+    assert_eq!(sets[0].lb, Some(1.0)); // lb==1 if user entered it in lbs
 
     let sets = parse_set_line("180 kg x 5").unwrap();
     assert_eq!(sets.len(), 1);
@@ -458,7 +500,9 @@ fn test_format_rpe() {
         set_type: Some(0),
         usebw: None,
     };
-    unsafe { std::env::set_var("WXRUST_COLOR", "never"); }
+    unsafe {
+        std::env::set_var("WXRUST_COLOR", "never");
+    }
     let formatted = format_set(&set);
     assert_eq!(formatted, "405 x 5 @8");
 }
@@ -497,7 +541,9 @@ fn test_format_bw() {
         set_type: Some(0),
         usebw: Some(1),
     };
-    unsafe { std::env::set_var("WXRUST_COLOR", "never"); }
+    unsafe {
+        std::env::set_var("WXRUST_COLOR", "never");
+    }
     let formatted = format_set(&set);
     assert_eq!(formatted, "BW x 10");
 
@@ -538,7 +584,7 @@ fn test_parser_options_kg() {
 ";
     let options = ParserOptions::new(true); // user wants kg
     let jday = parse_workout_with_options(text, &options).unwrap();
-    
+
     assert_eq!(jday.bw, Some(100.0)); // 100 kg
     assert_eq!(jday.eblocks[0].sets[0].w, Some(200.0)); // 200 kg
 }
@@ -553,7 +599,7 @@ fn test_parser_options_lbs() {
 ";
     let options = ParserOptions::new(false); // user wants lbs
     let jday = parse_workout_with_options(text, &options).unwrap();
-    
+
     // Body weight explicitly marked as lbs, so it converts to kg
     let expected_bw_kg = 220.0 / LBS_PER_KG;
     assert!(
@@ -562,7 +608,7 @@ fn test_parser_options_lbs() {
         jday.bw.unwrap(),
         expected_bw_kg
     );
-    
+
     // Weight without explicit unit, should be interpreted as lbs and converted to kg
     let expected_weight_kg = 440.0 / LBS_PER_KG;
     assert!(
@@ -578,7 +624,7 @@ fn test_parser_options_round_trip_lbs() {
     // This test simulates the issue: format with lbs preference, then parse with lbs preference
     forget_cached_user_wants_kg();
     write_cached_user_wants_kg(false); // User prefers lbs
-    
+
     // Create a workout with 100kg weight
     let exercise = Exercise {
         id: "squat".to_string(),
@@ -586,9 +632,16 @@ fn test_parser_options_round_trip_lbs() {
         ex_type: None,
     };
     let ex_wrapper = ExerciseWrapper { exercise };
-    let sets = vec![
-        Set { w: Some(100.0), r: Some(5), s: Some(1), lb: Some(0.0), rpe: None, c: None, set_type: Some(0), usebw: None },
-    ];
+    let sets = vec![Set {
+        w: Some(100.0),
+        r: Some(5),
+        s: Some(1),
+        lb: Some(0.0),
+        rpe: None,
+        c: None,
+        set_type: Some(0),
+        usebw: None,
+    }];
     let eblock = EBlock {
         eid: "squat".to_string(),
         sets,
@@ -599,23 +652,26 @@ fn test_parser_options_round_trip_lbs() {
         eblocks: vec![eblock],
         exercises: vec![ex_wrapper],
     };
-    
+
     // Format for cache (will use lbs since user wants lbs)
     let cache_text = format_workout_for_cache("2025-01-21", &jday);
-    
+
     eprintln!("Cache text:\n{}", cache_text);
-    
+
     // The cache should show weights in lbs
     assert!(cache_text.contains("220")); // 100kg * 2.20462 ≈ 220 lbs bodyweight
     assert!(cache_text.contains("lbs bw"));
-    
+
     // Now parse it back with user wants lbs
     let options = ParserOptions::new(false); // user wants lbs
     let parsed = parse_workout_with_options(&cache_text, &options).unwrap();
-    
+
     eprintln!("Original weight (kg): {}", 100.0);
-    eprintln!("Parsed weight (kg): {}", parsed.eblocks[0].sets[0].w.unwrap());
-    
+    eprintln!(
+        "Parsed weight (kg): {}",
+        parsed.eblocks[0].sets[0].w.unwrap()
+    );
+
     // The parsed weight should be back to ~100kg
     // Note: There will be rounding error because format_workout_for_cache formats weights as
     // integer lbs (220 lbs), so 100kg → 220.462 lbs → 220 lbs → 99.79kg
@@ -625,7 +681,7 @@ fn test_parser_options_round_trip_lbs() {
         parsed.eblocks[0].sets[0].w.unwrap(),
         100.0
     );
-    
+
     // Body weight has more precision (4 decimal places), so it should be closer
     assert!(
         roughly_equal(parsed.bw.unwrap(), 100.0, 0.01),
@@ -633,7 +689,7 @@ fn test_parser_options_round_trip_lbs() {
         parsed.bw.unwrap(),
         100.0
     );
-    
+
     // Cleanup
     forget_cached_user_wants_kg();
 }
@@ -666,9 +722,21 @@ fn test_bw_parsing_without_units_bug() {
     let expected_60_kg = 60.0 / LBS_PER_KG;
     let expected_100_kg = 100.0 / LBS_PER_KG;
 
-    assert!(roughly_equal(jday.eblocks[0].sets[0].w.unwrap(), expected_50_kg, 0.01));
-    assert!(roughly_equal(jday.eblocks[1].sets[0].w.unwrap(), expected_60_kg, 0.01));
-    assert!(roughly_equal(jday.eblocks[2].sets[0].w.unwrap(), expected_100_kg, 0.01));
+    assert!(roughly_equal(
+        jday.eblocks[0].sets[0].w.unwrap(),
+        expected_50_kg,
+        0.01
+    ));
+    assert!(roughly_equal(
+        jday.eblocks[1].sets[0].w.unwrap(),
+        expected_60_kg,
+        0.01
+    ));
+    assert!(roughly_equal(
+        jday.eblocks[2].sets[0].w.unwrap(),
+        expected_100_kg,
+        0.01
+    ));
 
     // After fix: both bw and weights are consistently treated as lbs and converted to kg
 }

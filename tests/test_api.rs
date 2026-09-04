@@ -1,5 +1,5 @@
 use mockall::mock;
-use wxrust::api::{login_request, graphql_request};
+use wxrust::api::{graphql_request, login_request};
 use wxrust::models::{GraphQLRequest, GraphQLResponse, LoginData, LoginVariables, User};
 
 mock! {
@@ -15,22 +15,24 @@ mock! {
     }
 }
 
-
-
 #[tokio::test]
 async fn test_login_request_free() {
     let mut mock_client = MockApiClient::new();
-    mock_client
-        .expect_login_request()
-        .times(1)
-        .returning(|_| Ok(GraphQLResponse {
-            data: Some(LoginData { login: "token".to_string() }),
+    mock_client.expect_login_request().times(1).returning(|_| {
+        Ok(GraphQLResponse {
+            data: Some(LoginData {
+                login: "token".to_string(),
+            }),
             errors: None,
-        }));
+        })
+    });
 
     let request = GraphQLRequest {
         query: "mutation".to_string(),
-        variables: LoginVariables { u: "user".to_string(), p: "pass".to_string() },
+        variables: LoginVariables {
+            u: "user".to_string(),
+            p: "pass".to_string(),
+        },
     };
 
     let result = login_request(&mock_client, &request).await;
@@ -45,10 +47,12 @@ async fn test_graphql_request_free() {
     mock_client
         .expect_graphql_request::<serde_json::Value>()
         .times(1)
-        .returning(|_, _, _| Ok(GraphQLResponse {
-            data: Some(serde_json::json!({"test": "data"})),
-            errors: None,
-        }));
+        .returning(|_, _, _| {
+            Ok(GraphQLResponse {
+                data: Some(serde_json::json!({"test": "data"})),
+                errors: None,
+            })
+        });
 
     let result = graphql_request(&mock_client, "token", "query", None).await;
     assert!(result.is_ok());

@@ -1,5 +1,5 @@
-use wxrust::heatmap::{compute_metric, Metric};
-use wxrust::models::{JDay, Exercise, EBlock, Set};
+use wxrust::heatmap::{Metric, compute_metric};
+use wxrust::models::{EBlock, Exercise, JDay, Set};
 
 #[test]
 fn test_compute_metric_sets() {
@@ -93,25 +93,21 @@ fn create_test_jday() -> JDay {
     let eblocks = vec![
         EBlock {
             eid: "ex1".to_string(),
-            sets: vec![
-                Set {
-                    w: Some(100.0),
-                    r: Some(5),
-                    s: Some(2),
-                    ..Default::default()
-                },
-            ],
+            sets: vec![Set {
+                w: Some(100.0),
+                r: Some(5),
+                s: Some(2),
+                ..Default::default()
+            }],
         },
         EBlock {
             eid: "ex2".to_string(),
-            sets: vec![
-                Set {
-                    w: Some(100.0),
-                    r: Some(5),
-                    s: Some(4),
-                    ..Default::default()
-                },
-            ],
+            sets: vec![Set {
+                w: Some(100.0),
+                r: Some(5),
+                s: Some(4),
+                ..Default::default()
+            }],
         },
     ];
 

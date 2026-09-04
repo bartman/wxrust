@@ -101,7 +101,10 @@ pub async fn fetch_command<C: ApiClient>(
     pb.finish_with_message("Done");
 
     if stats {
-        println!("{}", format_transfer_stats(need.len() as u64, bytes, elapsed_secs));
+        println!(
+            "{}",
+            format_transfer_stats(need.len() as u64, bytes, elapsed_secs)
+        );
     }
 
     Ok(())
@@ -130,7 +133,10 @@ async fn fetch_diff<C: ApiClient>(
     pb.finish_and_clear();
 
     if stats {
-        println!("{}", format_transfer_stats(fetched.len() as u64, bytes, elapsed_secs));
+        println!(
+            "{}",
+            format_transfer_stats(fetched.len() as u64, bytes, elapsed_secs)
+        );
     }
 
     for (date, server_jday) in fetched {
@@ -151,7 +157,8 @@ async fn fetch_diff<C: ApiClient>(
 }
 
 fn fetch_from_file(uid: u32, file_path: &str, _verbose: bool) -> Result<(), String> {
-    let content = fs::read_to_string(file_path).map_err(|e| format!("Failed to read file: {}", e))?;
+    let content =
+        fs::read_to_string(file_path).map_err(|e| format!("Failed to read file: {}", e))?;
 
     let workouts = parse_file_export(&content)?;
 
@@ -192,7 +199,8 @@ fn parse_file_export(content: &str) -> Result<Vec<(String, models::JDay)>, Strin
             }
 
             let workout_text = format!("{}\n{}", date, workout_lines.join("\n"));
-            let jday = parsers::parse_workout_with_options(&workout_text, &options).map_err(|e| format!("Failed to parse workout for {}: {}", date, e))?;
+            let jday = parsers::parse_workout_with_options(&workout_text, &options)
+                .map_err(|e| format!("Failed to parse workout for {}: {}", date, e))?;
             workouts_list.push((date, jday));
         } else {
             i += 1;

@@ -1,8 +1,8 @@
 use crate::api::ApiClient;
-use crate::workouts;
-use crate::utils;
 use crate::formatters;
-use crate::table::{parse_date_and_filter_arguments, matches_any_filter};
+use crate::table::{matches_any_filter, parse_date_and_filter_arguments};
+use crate::utils;
+use crate::workouts;
 
 pub async fn handle_list<C: ApiClient>(
     list: &crate::ListArgs,
@@ -57,14 +57,17 @@ pub async fn handle_list<C: ApiClient>(
     let workouts: Vec<_> = if filters.is_empty() {
         workouts
     } else {
-        workouts.into_iter().filter(|(_, jday)| {
-            jday.eblocks.iter().any(|eblock| {
-                jday.exercises.iter().any(|ex_wrap| {
-                    ex_wrap.exercise.id == eblock.eid
-                        && matches_any_filter(&ex_wrap.exercise.name, &filters)
+        workouts
+            .into_iter()
+            .filter(|(_, jday)| {
+                jday.eblocks.iter().any(|eblock| {
+                    jday.exercises.iter().any(|ex_wrap| {
+                        ex_wrap.exercise.id == eblock.eid
+                            && matches_any_filter(&ex_wrap.exercise.name, &filters)
+                    })
                 })
             })
-        }).collect()
+            .collect()
     };
 
     if workouts.is_empty() {

@@ -1,5 +1,5 @@
+use wxrust::models::{EBlock, Exercise, ExerciseWrapper, JDay, Set};
 use wxrust::table::*;
-use wxrust::models::{JDay, Set, Exercise, ExerciseWrapper, EBlock};
 
 // ============================================================================
 // 1RM Calculation Tests
@@ -376,7 +376,9 @@ fn test_format_table_with_records() {
     let filters: Vec<String> = vec!["dead".to_string()];
 
     // Disable color for testing
-    unsafe { std::env::set_var("WXRUST_COLOR", "never"); }
+    unsafe {
+        std::env::set_var("WXRUST_COLOR", "never");
+    }
 
     let output = format_table(&state, &filters, true);
 
@@ -393,7 +395,9 @@ fn test_format_table_header_row() {
 
     let filters: Vec<String> = vec![];
 
-    unsafe { std::env::set_var("WXRUST_COLOR", "never"); }
+    unsafe {
+        std::env::set_var("WXRUST_COLOR", "never");
+    }
 
     let output = format_table(&state, &filters, true);
 
@@ -412,7 +416,9 @@ fn test_format_table_best_weight_row() {
 
     let filters: Vec<String> = vec![];
 
-    unsafe { std::env::set_var("WXRUST_COLOR", "never"); }
+    unsafe {
+        std::env::set_var("WXRUST_COLOR", "never");
+    }
 
     let output = format_table(&state, &filters, true);
 

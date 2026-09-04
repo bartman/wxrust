@@ -1,6 +1,6 @@
+use lazy_static::lazy_static;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use lazy_static::lazy_static;
 
 lazy_static! {
     static ref CREDENTIALS_PATH: Mutex<Option<String>> = Mutex::new(None);
@@ -30,7 +30,12 @@ pub fn get_credentials_path() -> Result<String, String> {
 
     // Fallback to ~/.config
     if let Ok(home) = std::env::var("HOME") {
-        paths.push(PathBuf::from(home).join(".config").join("wxrust").join("credentials.txt"));
+        paths.push(
+            PathBuf::from(home)
+                .join(".config")
+                .join("wxrust")
+                .join("credentials.txt"),
+        );
     }
 
     // Current directory

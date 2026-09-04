@@ -1,19 +1,19 @@
-mod models;
-mod formatters;
-mod auth;
 mod api;
-mod workouts;
-mod utils;
-mod parsers;
+mod auth;
 mod fetch;
-mod table;
+mod formatters;
 mod heatmap;
 mod list;
+mod models;
+mod parsers;
+mod table;
+mod utils;
+mod workouts;
 
 use clap::{Parser, Subcommand};
 
-use wxrust::credentials;
 use crate::api::ReqwestClient;
+use wxrust::credentials;
 
 #[derive(Parser)]
 #[command(name = "wxrust")]
@@ -40,7 +40,13 @@ struct Args {
     no_cache_write: bool,
 
     /// Days to scan for new workouts (0=since last cached, -1=full history)
-    #[arg(short = 's', long = "scan-days", default_value_t = 0, allow_hyphen_values = true, value_name = "DAYS")]
+    #[arg(
+        short = 's',
+        long = "scan-days",
+        default_value_t = 0,
+        allow_hyphen_values = true,
+        value_name = "DAYS"
+    )]
     scan_days: i32,
 
     /// When to color output: auto, always, never
@@ -206,8 +212,6 @@ struct HeatmapArgs {
     args: Vec<String>,
 }
 
-
-
 async fn handle_show(
     show: &ShowArgs,
     data_access: api::DataAccess<'_, ReqwestClient>,
@@ -260,7 +264,9 @@ async fn handle_fetch(
         fetch_args.file.as_deref(),
         verbose,
         fetch_args.stats,
-    ).await {
+    )
+    .await
+    {
         utils::exit_with_error(e);
     }
 }
@@ -278,7 +284,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         utils::exit_with_error("Error: --scan-days must be -1 or greater");
     }
 
-    unsafe { std::env::set_var("WXRUST_COLOR", &args.color); }
+    unsafe {
+        std::env::set_var("WXRUST_COLOR", &args.color);
+    }
 
     let token_path = match workouts::get_cache_base_dir() {
         Ok(dir) => dir.join("token").to_string_lossy().to_string(),
@@ -299,9 +307,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(e) => {
             eprintln!("ERROR: {}", e);
             eprintln!();
-            eprintln!("Please create it with email on first line and password on second line at one of these locations:");
+            eprintln!(
+                "Please create it with email on first line and password on second line at one of these locations:"
+            );
             if let Some(config_dir) = dirs::config_dir() {
-                eprintln!("- {}", config_dir.join("wxrust").join("credentials.txt").display());
+                eprintln!(
+                    "- {}",
+                    config_dir.join("wxrust").join("credentials.txt").display()
+                );
             }
             if let Ok(home) = std::env::var("HOME") {
                 eprintln!("- {}/.config/wxrust/credentials.txt", home);
@@ -312,7 +325,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let client = ReqwestClient::new_with_verbose(args.verbose);
-    let (token, uid) = setup_auth_and_data_access(&client, &credentials_path, &token_path, args.no_network, args.force_auth).await;
+    let (token, uid) = setup_auth_and_data_access(
+        &client,
+        &credentials_path,
+        &token_path,
+        args.no_network,
+        args.force_auth,
+    )
+    .await;
 
     let data_access = api::DataAccess {
         client: &client,
@@ -327,16 +347,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match args.command {
         Commands::List(list) => {
             list::handle_list(&list, data_access, args.verbose).await;
-        },
+        }
         Commands::Show(show) => {
             handle_show(&show, data_access, args.verbose).await;
-        },
+        }
         Commands::Fetch(fetch_args) => {
             handle_fetch(&fetch_args, data_access, args.verbose).await;
-        },
+        }
         Commands::Table(table_args) => {
-            table::handle_table(data_access, &table_args.args, &table_args.dream, args.verbose).await;
-        },
+            table::handle_table(
+                data_access,
+                &table_args.args,
+                &table_args.dream,
+                args.verbose,
+            )
+            .await;
+        }
         Commands::Heatmap(heatmap_args) => {
             // Determine metric - default to OneRm
             let metric = if heatmap_args.sets {
@@ -359,7 +385,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 heatmap_args.green,
                 &heatmap_args.args,
                 args.verbose,
-            ).await;
+            )
+            .await;
         }
     }
 

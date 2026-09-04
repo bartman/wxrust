@@ -1,12 +1,14 @@
-use mockall::mock;
-use tempfile::TempDir;
 use lazy_static::lazy_static;
-use tokio::sync::Mutex;
-use wxrust::models::{GraphQLResponse, JDay, EBlock, ExerciseWrapper, Exercise, Set, User};
-use wxrust::workouts::{forget_cached_user_wants_kg, format_cached_jday_text, read_cached_jday_text};
-use wxrust::parsers::parse_workout;
-use wxrust::formatters::format_workout_for_cache;
+use mockall::mock;
 use std::fs;
+use tempfile::TempDir;
+use tokio::sync::Mutex;
+use wxrust::formatters::format_workout_for_cache;
+use wxrust::models::{EBlock, Exercise, ExerciseWrapper, GraphQLResponse, JDay, Set, User};
+use wxrust::parsers::parse_workout;
+use wxrust::workouts::{
+    forget_cached_user_wants_kg, format_cached_jday_text, read_cached_jday_text,
+};
 
 lazy_static! {
     static ref ENV_MUTEX: Mutex<()> = Mutex::new(());
@@ -51,9 +53,13 @@ fn sample_jday() -> JDay {
 
 fn restore_xdg(original: Result<String, std::env::VarError>) {
     if let Ok(original) = original {
-        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+        unsafe {
+            std::env::set_var("XDG_CACHE_HOME", original);
+        }
     } else {
-        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+        unsafe {
+            std::env::remove_var("XDG_CACHE_HOME");
+        }
     }
 }
 
@@ -62,7 +68,9 @@ async fn test_fetch_command_skips_cached() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
     forget_cached_user_wants_kg();
 
     let cache_dir = temp_dir.path().join("wxrust").join("123");
@@ -70,7 +78,8 @@ async fn test_fetch_command_skips_cached() {
     fs::write(
         cache_dir.join("2023-10-01.txt"),
         "2023-10-01\n@ 80 kg bw\n#Squat\n135 x 5\n",
-    ).unwrap();
+    )
+    .unwrap();
 
     let mock_client = MockApiClient::new();
     let data_access = wxrust::api::DataAccess {
@@ -84,7 +93,8 @@ async fn test_fetch_command_skips_cached() {
     };
 
     let dates = vec!["2023-10-01".to_string()];
-    let result = wxrust::fetch::fetch_command(&data_access, &dates, false, false, None, false, false).await;
+    let result =
+        wxrust::fetch::fetch_command(&data_access, &dates, false, false, None, false, false).await;
     assert!(result.is_ok());
 
     restore_xdg(original_xdg_cache);
@@ -95,7 +105,9 @@ async fn test_fetch_command_fetches_and_caches() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
     forget_cached_user_wants_kg();
 
     let mut mock_client = MockApiClient::new();
@@ -137,11 +149,19 @@ async fn test_fetch_command_fetches_and_caches() {
     };
 
     let dates = vec!["2023-10-01".to_string()];
-    let result = wxrust::fetch::fetch_command(&data_access, &dates, false, false, None, false, false).await;
+    let result =
+        wxrust::fetch::fetch_command(&data_access, &dates, false, false, None, false, false).await;
     assert!(result.is_ok());
 
-    let cache_path = temp_dir.path().join("wxrust").join("123").join("2023-10-01.txt");
-    assert!(cache_path.exists(), "fetch should write cache even if write_cache is false");
+    let cache_path = temp_dir
+        .path()
+        .join("wxrust")
+        .join("123")
+        .join("2023-10-01.txt");
+    assert!(
+        cache_path.exists(),
+        "fetch should write cache even if write_cache is false"
+    );
 
     restore_xdg(original_xdg_cache);
 }
@@ -151,7 +171,9 @@ async fn test_fetch_command_no_dates() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
     forget_cached_user_wants_kg();
 
     let mock_client = MockApiClient::new();
@@ -165,7 +187,16 @@ async fn test_fetch_command_no_dates() {
         scan_days: 0,
     };
 
-    let result = wxrust::fetch::fetch_command(&data_access, &["2023-10-01".to_string()], false, false, None, false, false).await;
+    let result = wxrust::fetch::fetch_command(
+        &data_access,
+        &["2023-10-01".to_string()],
+        false,
+        false,
+        None,
+        false,
+        false,
+    )
+    .await;
     assert!(result.is_ok());
 
     restore_xdg(original_xdg_cache);
@@ -176,7 +207,9 @@ async fn test_fetch_command_force_refetches() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
     forget_cached_user_wants_kg();
 
     let cache_dir = temp_dir.path().join("wxrust").join("123");
@@ -184,7 +217,8 @@ async fn test_fetch_command_force_refetches() {
     fs::write(
         cache_dir.join("2023-10-01.txt"),
         "2023-10-01\n@ 80 kg bw\n#Squat\n100 x 5\n",
-    ).unwrap();
+    )
+    .unwrap();
 
     let mut mock_client = MockApiClient::new();
     mock_client
@@ -225,7 +259,8 @@ async fn test_fetch_command_force_refetches() {
     };
 
     let dates = vec!["2023-10-01".to_string()];
-    let result = wxrust::fetch::fetch_command(&data_access, &dates, false, true, None, false, false).await;
+    let result =
+        wxrust::fetch::fetch_command(&data_access, &dates, false, true, None, false, false).await;
     assert!(result.is_ok());
 
     restore_xdg(original_xdg_cache);
@@ -236,7 +271,9 @@ async fn test_fetch_command_without_force_skips_network() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
     forget_cached_user_wants_kg();
 
     let cache_dir = temp_dir.path().join("wxrust").join("123");
@@ -244,7 +281,8 @@ async fn test_fetch_command_without_force_skips_network() {
     fs::write(
         cache_dir.join("2023-10-01.txt"),
         "2023-10-01\n@ 80 kg bw\n#Squat\n100 x 5\n",
-    ).unwrap();
+    )
+    .unwrap();
 
     let mut mock_client = MockApiClient::new();
     mock_client
@@ -277,7 +315,8 @@ async fn test_fetch_command_without_force_skips_network() {
     };
 
     let dates = vec!["2023-10-01".to_string()];
-    let result = wxrust::fetch::fetch_command(&data_access, &dates, false, false, None, false, false).await;
+    let result =
+        wxrust::fetch::fetch_command(&data_access, &dates, false, false, None, false, false).await;
     assert!(result.is_ok());
 
     restore_xdg(original_xdg_cache);
@@ -307,7 +346,9 @@ async fn test_format_text_diff_ignores_parse_roundtrip_newline() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
     forget_cached_user_wants_kg();
     let jday = sample_jday();
     let cache_text = format_cached_jday_text("2023-10-01", &jday);
@@ -327,7 +368,9 @@ async fn test_fetch_diff_identical_cache_is_ok() {
     let _guard = ENV_MUTEX.lock().await;
     let temp_dir = TempDir::new().unwrap();
     let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
-    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    unsafe {
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
+    }
     forget_cached_user_wants_kg();
 
     let jday = sample_jday();
@@ -336,7 +379,8 @@ async fn test_fetch_diff_identical_cache_is_ok() {
     fs::write(
         cache_dir.join("2023-10-01.txt"),
         format_cached_jday_text("2023-10-01", &jday),
-    ).unwrap();
+    )
+    .unwrap();
 
     let mut mock_client = MockApiClient::new();
     mock_client
@@ -365,9 +409,7 @@ async fn test_fetch_diff_identical_cache_is_ok() {
                 errors: None,
             })
         });
-    mock_client
-        .expect_user_wants_kg()
-        .returning(|_| true);
+    mock_client.expect_user_wants_kg().returning(|_| true);
 
     let data_access = wxrust::api::DataAccess {
         client: &mock_client,
@@ -380,7 +422,8 @@ async fn test_fetch_diff_identical_cache_is_ok() {
     };
 
     let dates = vec!["2023-10-01".to_string()];
-    let result = wxrust::fetch::fetch_command(&data_access, &dates, true, false, None, false, false).await;
+    let result =
+        wxrust::fetch::fetch_command(&data_access, &dates, true, false, None, false, false).await;
     assert!(result.is_ok());
     assert_eq!(
         read_cached_jday_text(123, "2023-10-01").as_deref(),

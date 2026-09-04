@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
-use chrono::{Datelike, NaiveDate, Weekday, Month};
+use chrono::{Datelike, Month, NaiveDate, Weekday};
 use num_traits::cast::FromPrimitive;
 
 use crate::api::{ApiClient, DataAccess};
-use crate::models::{JDay, Exercise};
-use crate::workouts;
-use crate::utils;
+use crate::models::{Exercise, JDay};
 use crate::table::{calculate_1rm, parse_date_and_filter_arguments};
+use crate::utils;
+use crate::workouts;
 
 /// Metric to use for intensity calculation
 #[derive(Debug, Clone, Copy)]
@@ -35,7 +35,10 @@ pub fn compute_metric(jday: &JDay, metric: Metric, filters: &[String]) -> f64 {
             // Check if this exercise matches our filters
             if !filters.is_empty() {
                 let name_lower = ex.name.to_lowercase();
-                if !filters.iter().any(|f| name_lower.contains(&f.to_lowercase())) {
+                if !filters
+                    .iter()
+                    .any(|f| name_lower.contains(&f.to_lowercase()))
+                {
                     continue;
                 }
             }
@@ -82,7 +85,6 @@ pub async fn handle_heatmap<C: ApiClient>(
     args: &[String],
     verbose: bool,
 ) {
-
     // Parse arguments into dates and exercise filters
     let (date_args, filters) = parse_date_and_filter_arguments(args);
 
@@ -164,7 +166,10 @@ pub async fn handle_heatmap<C: ApiClient>(
     let end_date = *date_list.last().unwrap();
 
     // Find min and max values
-    let max_value = daily_values.values().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let max_value = daily_values
+        .values()
+        .cloned()
+        .fold(f64::NEG_INFINITY, f64::max);
     let min_value = daily_values.values().cloned().fold(f64::INFINITY, f64::min);
 
     if verbose {
@@ -177,7 +182,14 @@ pub async fn handle_heatmap<C: ApiClient>(
     }
 
     // Draw the heatmap
-    draw_heatmap(daily_values, start_date, end_date, min_value, max_value, green);
+    draw_heatmap(
+        daily_values,
+        start_date,
+        end_date,
+        min_value,
+        max_value,
+        green,
+    );
 }
 
 /// Draw the heatmap to the console.
@@ -268,7 +280,9 @@ fn draw_heatmap(
                                 format!("\x1b[38;2;0;{};0m", intensity)
                             } else {
                                 // Solarized: use table gradient colors (default)
-                                let gradient_index = (intensity as usize * (crate::table::GRADIENT.len() - 1) / 255).min(crate::table::GRADIENT.len() - 1);
+                                let gradient_index =
+                                    (intensity as usize * (crate::table::GRADIENT.len() - 1) / 255)
+                                        .min(crate::table::GRADIENT.len() - 1);
                                 format!("\x1b[38;5;{}m", crate::table::GRADIENT[gradient_index])
                             };
                             format!("{} ◀▶\x1b[0m", color_code)
@@ -281,7 +295,8 @@ fn draw_heatmap(
                                 2 => " ◂▸",
                                 3 => " ◃▹",
                                 _ => " ◀▶",
-                            }.to_string()
+                            }
+                            .to_string()
                         }
                     }
                     _ => {
@@ -303,7 +318,10 @@ fn draw_heatmap(
     let mut last_month = 0;
     for date in &week_dates {
         if date.month() != last_month {
-            print!("{:3}", Month::from_u32(date.month()).unwrap().name()[..3].to_string());
+            print!(
+                "{:3}",
+                Month::from_u32(date.month()).unwrap().name()[..3].to_string()
+            );
             last_month = date.month();
         } else {
             print!("   ");
