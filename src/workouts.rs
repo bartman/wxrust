@@ -193,24 +193,35 @@ pub fn get_dates_from_cache(uid: u32, latest: Option<String>, oldest: Option<Str
 }
 
 pub fn lookup_cached_jday(uid: u32, date: &str, verbose: bool) -> Option<models::JDay> {
-    if let Ok(cache_path) = get_cache_file_path(uid, date)
-        && cache_path.exists()
-            && let Ok(content) = fs::read_to_string(&cache_path) {
-                // Use cached user preference to parse the cached workout
-                let user_wants_kg = read_cached_user_wants_kg_or(true);
-                let options = parsers::ParserOptions::new(user_wants_kg);
-                if let Ok(jday) = parsers::parse_workout_with_options(&content, &options) {
-                    if verbose {
-                        eprintln!("\x1b[34mgetting {} from cache {}\x1b[0m", date, cache_path.display());
-                    }
-                    return Some(jday);
+    if let Some(content) = read_cached_jday_text(uid, date) {
+        // Use cached user preference to parse the cached workout
+        let user_wants_kg = read_cached_user_wants_kg_or(true);
+        let options = parsers::ParserOptions::new(user_wants_kg);
+        if let Ok(jday) = parsers::parse_workout_with_options(&content, &options) {
+            if verbose
+                && let Ok(cache_path) = get_cache_file_path(uid, date) {
+                    eprintln!("\x1b[34mgetting {} from cache {}\x1b[0m", date, cache_path.display());
                 }
+            return Some(jday);
+        }
 
-                if verbose {
-                    eprintln!("\x1b[34mfailed parsing {} from cache {}\x1b[0m", date, cache_path.display());
-                }
+        if verbose
+            && let Ok(cache_path) = get_cache_file_path(uid, date) {
+                eprintln!("\x1b[34mfailed parsing {} from cache {}\x1b[0m", date, cache_path.display());
             }
+    }
     None
+}
+
+/// Raw cache file contents for uid/date, if the file exists and is readable.
+pub fn read_cached_jday_text(uid: u32, date: &str) -> Option<String> {
+    let cache_path = get_cache_file_path(uid, date).ok()?;
+    fs::read_to_string(cache_path).ok()
+}
+
+/// Text stored by `write_cached_jday` (formatted workout plus a trailing newline).
+pub fn format_cached_jday_text(date: &str, jday: &models::JDay) -> String {
+    formatters::format_workout_for_cache(date, jday) + "\n"
 }
 
 pub fn write_cached_jday(uid: u32, date: &str, jday: &models::JDay) {
@@ -218,8 +229,7 @@ pub fn write_cached_jday(uid: u32, date: &str, jday: &models::JDay) {
         if let Some(parent) = cache_path.parent() {
             let _ = fs::create_dir_all(parent);
         }
-        let plain = formatters::format_workout_for_cache(date, jday);
-        let plain = plain + "\n";
+        let plain = format_cached_jday_text(date, jday);
         // Write to temp file then rename
         let temp_path = cache_path.with_extension("tmp");
         if let Ok(()) = fs::write(&temp_path, plain) {

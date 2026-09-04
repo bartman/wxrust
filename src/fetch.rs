@@ -134,9 +134,12 @@ async fn fetch_diff<C: ApiClient>(
     }
 
     for (date, server_jday) in fetched {
-        let local_jday = workouts::lookup_cached_jday(uid, &date, verbose);
-        if let Some(local) = local_jday {
-            show_diff(&date, &local, &server_jday);
+        let server_text = workouts::format_cached_jday_text(&date, &server_jday);
+        if let Some(local_text) = workouts::read_cached_jday_text(uid, &date) {
+            // Compare the cache file to what a fetch would write. Parsing the
+            // cache and reformatting it is not a round-trip (parser adds a
+            // trailing newline to `log`), so that path flagged every workout.
+            show_diff(&date, &local_text, &server_text);
         } else {
             println!("{}: No local cache, server version:", date);
             let workout = formatters::format_workout(&date, &server_jday, user_wants_kg);
@@ -224,18 +227,26 @@ async fn get_dates_to_fetch<C: ApiClient>(
     }
 }
 
-fn show_diff(date: &str, local: &models::JDay, server: &models::JDay) {
-    let local_text = formatters::format_workout_for_cache(date, local);
-    let server_text = formatters::format_workout_for_cache(date, server);
+fn show_diff(date: &str, local_text: &str, server_text: &str) {
+    if let Some(diff) = format_text_diff(date, local_text, server_text) {
+        print!("{}", diff);
+        println!();
+    }
+}
 
-    println!("Diff for {}:", date);
-    let diff = similar::TextDiff::from_lines(&local_text, &server_text);
+/// Unified-style diff of local cache text vs server text. `None` if identical.
+pub fn format_text_diff(date: &str, local_text: &str, server_text: &str) -> Option<String> {
+    if local_text == server_text {
+        return None;
+    }
+    let mut out = format!("Diff for {}:\n", date);
+    let diff = similar::TextDiff::from_lines(local_text, server_text);
     for change in diff.iter_all_changes() {
         match change.tag() {
-            similar::ChangeTag::Delete => print!("\x1b[31m-{}\x1b[0m", change),
-            similar::ChangeTag::Insert => print!("\x1b[32m+{}\x1b[0m", change),
-            similar::ChangeTag::Equal => print!(" {}", change),
+            similar::ChangeTag::Delete => out.push_str(&format!("\x1b[31m-{}\x1b[0m", change)),
+            similar::ChangeTag::Insert => out.push_str(&format!("\x1b[32m+{}\x1b[0m", change)),
+            similar::ChangeTag::Equal => out.push_str(&format!(" {}", change)),
         }
     }
-    println!();
+    Some(out)
 }

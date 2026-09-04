@@ -88,12 +88,12 @@ Create a `credentials.txt` file with your WeightXReps account email on the first
 
 - Fetch and cache workouts for 2025: `wxrust fetch 2025`
 - Fetch all workouts: `wxrust fetch`
-- Show diff between local and server: `wxrust fetch --diff 2025-10`
+- Show diff between local and server: `wxrust fetch --diff 2025-10` (only workouts whose cache file would change)
 - Force re-download: `wxrust fetch --force 2025`
 - Import from text export file: `wxrust fetch --file export.txt`
 - Print transfer rate after fetch: `wxrust fetch --stats 2026`
 
-`fetch` downloads workouts concurrently (10 dates per GraphQL request, 8 requests in flight) and skips dates that are already cached unless `--force` is used. `--stats` prints `X workouts, Y seconds, x.y T/s, x.y MB/s` after the progress line.
+`fetch` downloads workouts concurrently (10 dates per GraphQL request, 8 requests in flight) and skips dates that are already cached unless `--force` is used. `--stats` prints `X workouts, Y seconds, x.y T/s, x.y MB/s` after the progress line. `--diff` compares the cache file to what a fetch would write and prints nothing for unchanged days.
 
 #### Table Command (PR Progression)
 

@@ -76,6 +76,7 @@ You can look in `weightxreps-client/src/data/generated---db-types-and-hooks.tsx`
 - Local caching of structured workout data in XDG_CACHE_HOME/wxrust/{uid}/yyyy-mm-dd.txt for offline access and performance.
 - Cache format is text, same as what is formatted for output using `format_workout_for_cache`
 - Bulk fetch command to download workouts from server into cache, with options for diff, force, file import, and `--stats` (prints `X workouts, Y seconds, x.y T/s, x.y MB/s` after the progress line). Fetch skips already-cached dates by checking file existence (no parse). Network fetches use batched concurrent `jday` queries. HTTP response body sizes are counted in `api::transfer_stats`.
+- **`fetch --diff` compares cache file text**, not a parse/reformat of the cache. `write_cached_jday` stores `format_workout_for_cache` plus a trailing newline (`format_cached_jday_text`). The parser always appends a newline to `JDay.log`, so `format(parse(cache))` is not a round-trip against the original server `JDay` and used to flag every workout as changed. Diff now reads the raw cache file (`read_cached_jday_text`) and only prints when it differs from what a fetch would write.
 - Progress bars for long-running operations using indicatif
 - Side-by-side diff display using similar crate for comparing local and server workouts
 - Parsing and formatting support for RPE (@ syntax), BW exercises (BW, BW+, BW-), lb/kg units
@@ -174,6 +175,8 @@ Recent refactoring extracted common code into helper functions to improve mainta
 - **Common Helpers**:
   - `workouts::resolve_user_wants_kg`: Consolidates logic for determining user weight unit preference, checking network token then falling back to cache.
   - `workouts::get_dates_from_ranges`: Unified logic for parsing date ranges and fetching/calculating dates, used by both `list` and `fetch` commands.
+  - `workouts::format_cached_jday_text` / `read_cached_jday_text`: Cache file text used by `write_cached_jday` and `fetch --diff`.
+  - `fetch::format_text_diff`: Unified-style diff; returns `None` when local and server texts are identical.
   - `utils::create_progress_bar`: Standardized progress bar creation using `indicatif`.
 
 These changes follow the project's guidelines for splitting functionality into helpers and writing unit tests.

@@ -1,5 +1,5 @@
 use mockall::mock;
-use wxrust::workouts::{get_jday, get_dates, get_dates_from_cache, get_jdays, get_jdays_batch, get_jdays_with_callback, read_cached_user_wants_kg, read_cached_user_wants_kg_or, write_cached_user_wants_kg, forget_cached_user_wants_kg, cached_jday_exists, jday_alias, chunk_dates, build_jday_query, build_batch_jday_query, JDAY_BATCH_SIZE};
+use wxrust::workouts::{get_jday, get_dates, get_dates_from_cache, get_jdays, get_jdays_batch, get_jdays_with_callback, read_cached_user_wants_kg, read_cached_user_wants_kg_or, write_cached_user_wants_kg, forget_cached_user_wants_kg, cached_jday_exists, read_cached_jday_text, format_cached_jday_text, write_cached_jday, jday_alias, chunk_dates, build_jday_query, build_batch_jday_query, JDAY_BATCH_SIZE};
 use wxrust::models::{GraphQLResponse, WorkoutData, JDay, EBlock, ExerciseWrapper, Exercise, Set, User};
 use base64::{Engine, engine::general_purpose};
 use tempfile::TempDir;
@@ -798,6 +798,50 @@ async fn test_cached_jday_exists() {
 
     assert!(cached_jday_exists(123, "2023-10-01"));
     assert!(!cached_jday_exists(123, "2023-10-02"));
+
+    if let Ok(original) = original_xdg_cache {
+        unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
+    } else {
+        unsafe { std::env::remove_var("XDG_CACHE_HOME"); }
+    }
+}
+
+#[tokio::test]
+async fn test_read_and_format_cached_jday_text() {
+    let _guard = ENV_MUTEX.lock().await;
+    let temp_dir = TempDir::new().unwrap();
+    let original_xdg_cache = std::env::var("XDG_CACHE_HOME");
+    unsafe { std::env::set_var("XDG_CACHE_HOME", temp_dir.path()); }
+    forget_cached_user_wants_kg();
+
+    assert!(read_cached_jday_text(123, "2023-10-01").is_none());
+
+    let jday = JDay {
+        log: "EBLOCK:ex1".to_string(),
+        bw: Some(80.0),
+        eblocks: vec![EBlock {
+            eid: "ex1".to_string(),
+            sets: vec![Set {
+                w: Some(135.0),
+                r: Some(5),
+                s: Some(1),
+                lb: Some(0.0),
+                ..Default::default()
+            }],
+        }],
+        exercises: vec![ExerciseWrapper {
+            exercise: Exercise {
+                id: "ex1".to_string(),
+                name: "Squat".to_string(),
+                ex_type: Some("strength".to_string()),
+            },
+        }],
+    };
+    write_cached_jday(123, "2023-10-01", &jday);
+
+    let written = read_cached_jday_text(123, "2023-10-01").unwrap();
+    assert_eq!(written, format_cached_jday_text("2023-10-01", &jday));
+    assert!(written.ends_with('\n'));
 
     if let Ok(original) = original_xdg_cache {
         unsafe { std::env::set_var("XDG_CACHE_HOME", original); }
