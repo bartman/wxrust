@@ -22,6 +22,8 @@ A Rust CLI tool to extract and display workouts from the WeightXReps.net website
 - Compares local cache with server versions
 - Imports workouts from text export files
 
+![wxrust table squat](examples/table-squat.png)
+
 ## Installation
 
 Clone the repository and build with Cargo:
