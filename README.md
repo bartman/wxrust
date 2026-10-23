@@ -37,15 +37,6 @@ edit ~/.config/wxrust/credentials.txt      # <-- username/password, 1 per line
 wxrust fetch
 ```
 
-## Testing
-
-Run unit tests with `cargo test`. For end-to-end smoke tests requiring credentials, use `./smoke.py`
-
-To capture failures, if any, use this:
-```bash
-./smoke.py --work-dir tmp --output smoke.log
-```
-
 ## Setup
 
 Create a `credentials.txt` file with your WeightXReps account email on the first line and password on the second. The program looks for this file in the following locations (in order):
@@ -176,6 +167,15 @@ wxrust table squat
 
 # Disable colors
 wxrust --color never list --summary --count 1
+```
+
+## Testing
+
+Run unit tests with `cargo test`. For end-to-end smoke tests requiring credentials, use `./smoke.py`
+
+To capture failures, if any, use this:
+```bash
+./smoke.py --work-dir tmp --output smoke.log
 ```
 
 ## Dependencies
