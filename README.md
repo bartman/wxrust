@@ -33,7 +33,7 @@ git clone https://github.com/bartman/wxrust.git
 cd wxrust
 cargo build --release
 cargo install --path .
-edit ~/.config/wxrust/credentials.txt      # <-- username/password, 1 per line
+edit ~/.config/wxrust/credentials.txt      # <-- username on line 1, password on line 2
 wxrust fetch
 ```
 
