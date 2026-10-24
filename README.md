@@ -11,7 +11,7 @@ A Rust CLI tool to extract and display workouts from the WeightXReps.net website
 
 ## Features
 
-- Authenticates using email and password from `credentials.txt` (email first line, password second)
+- Authenticates using username and password from `credentials.txt` (username first line, password second)
 - Authenticates and caches JWT token in `$XDG_CACHE_HOME/wxrust/token` (or `~/.cache/wxrust/token`)
 - Retrieves individual workouts or lists of workout dates
 - Formats output with colors matching the website editor
@@ -31,15 +31,15 @@ Clone the repository and build with Cargo:
 ```bash
 git clone https://github.com/bartman/wxrust.git
 cd wxrust
-cargo build --release
 cargo install --path .
+mkdir -p ~/.config/wxrust
 edit ~/.config/wxrust/credentials.txt      # <-- username on line 1, password on line 2
 wxrust fetch
 ```
 
 ## Setup
 
-Create a `credentials.txt` file with your WeightXReps account email on the first line and password on the second. The program looks for this file in the following locations (in order):
+Create a `credentials.txt` file with your WeightXReps account username on the first line and password on the second. The program looks for this file in the following locations (in order):
 
 - The path specified with `--credentials` option (if provided)
 - `$XDG_CONFIG_HOME/wxrust/credentials.txt` (or `~/.config/wxrust/credentials.txt` if `XDG_CONFIG_HOME` is not set)
